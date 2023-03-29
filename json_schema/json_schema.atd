@@ -1,0 +1,12 @@
+type json <ocaml module="Yojson.Safe" t="t"> = abstract
+type t = json
+
+(* TODO *)
+type schema =
+  [ String
+  | Number
+  | Integer
+  | Object
+  | Array
+  | Boolean
+  | Null ]

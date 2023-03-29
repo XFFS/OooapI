@@ -1,0 +1,8 @@
+#+title: OopenAI utilities
+
+* Constructing OCaml
+
+For constructing OCaml
+ https://ocaml-ppx.github.io/ppxlib/ppxlib/generating-code.html#metaquot
+* Tasks
+** TODO Automate conversion of yaml to json for specs, via yq

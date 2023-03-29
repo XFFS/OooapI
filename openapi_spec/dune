@@ -1,0 +1,15 @@
+(library
+ (name openapi_spec)
+ (libraries atdgen json_schema))
+
+(rule
+ (targets openapi_j.ml
+          openapi_j.mli)
+ (deps    openapi.atd)
+ (action  (run atdgen -j -j-std %{deps})))
+
+(rule
+ (targets openapi_t.ml
+          openapi_t.mli)
+ (deps    openapi.atd)
+ (action  (run atdgen -t %{deps})))
