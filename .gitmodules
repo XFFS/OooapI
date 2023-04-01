@@ -1,0 +1,3 @@
+[submodule "json-data-encoding"]
+	path = json-data-encoding
+	url = git@gitlab.com:nomadic-labs/json-data-encoding.git

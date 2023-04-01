@@ -16,14 +16,12 @@
   (dune (> 2.9))
   (ocaml (>= 5.0))
 
-  ; Utils
-  ; TODO Only with test?
-  ; Move into separate package?
+   ; Utils
+   ; TODO Only with test?
+   ; Move into separate package?
   ppxlib
   atdgen
-  ocplib-json-typed             ; For JSON Schema derivation
 
   (ppx_expect (and :with-test (>= v0.15.1)))
-  (alcotest :with-test)
-  (qcheck :with-test)
-  (qcheck-alcotest :with-test)))
+  (tezt :with-test)
+  ))

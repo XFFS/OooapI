@@ -12,11 +12,8 @@ depends: [
   "ocaml" {>= "5.0"}
   "ppxlib"
   "atdgen"
-  "ocplib-json-typed"
   "ppx_expect" {with-test & >= "v0.15.1"}
-  "alcotest" {with-test}
-  "qcheck" {with-test}
-  "qcheck-alcotest" {with-test}
+  "tezt" {with-test}
   "odoc" {with-doc}
 ]
 build: [
