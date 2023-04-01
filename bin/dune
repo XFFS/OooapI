@@ -1,6 +1,6 @@
 (executable
- (name ooo_spec_gen)
- (public_name ooosg)
+ (name oooapi)
+ (public_name oooapi)
  (libraries openapi_spec
             compiler-libs
             ppxlib
