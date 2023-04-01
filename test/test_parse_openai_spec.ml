@@ -1,18 +1,28 @@
 (* TODO: Proper tests *)
 
-let can_parse_paths () =
-  let open Openapi_spec in
-  let no_params = Openapi_path.of_string "foo/bar/baz" in
-  assert (Openapi_path.params no_params = []);
-  let with_params = Openapi_path.of_string "foo/{bar}/baz/{bing}/bong" in
-  assert (Openapi_path.params with_params = ["bar"; "bing"])
+open Tezt
+open Tezt.Base
 
-let can_parse_openapi_spec () =
-  let json = In_channel.(with_open_text "openapi-openai.json" input_all) in
-  match Openapi_spec.of_json json with
-  | Ok _ -> ()
-  | Error (`Msg err) -> Printf.sprintf "parse failure: %s" err |> failwith
+let test ?(tags = []) title f = Test.register ~__FILE__ ~title ~tags f;;
 
-let () =
-  can_parse_paths ();
-  can_parse_openapi_spec ()
+test "can parse paths" @@ fun () ->
+let open Openapi_spec in
+let path_params path = Openapi_path.(of_string path |> params) in
+Check.(
+  (path_params "foo/bar/baz" = [])
+    (list string)
+    ~error_msg:"expected no parameters");
+Check.(
+  (path_params "foo/{bar}/baz/{bing}/bong" = [ "bar"; "bing" ])
+    (list string)
+    ~error_msg:"expected parameters");
+unit
+;;
+
+test "can parse openapi spec" @@ fun () ->
+let json = In_channel.(with_open_text "openapi-openai.json" input_all) in
+match Openapi_spec.of_json json with
+| Ok _ -> unit
+| Error (`Msg err) -> Test.fail "parse failure: %s" err
+
+let () = Test.run ()
