@@ -16,12 +16,9 @@
   (dune (> 2.9))
   (ocaml (>= 5.0))
 
-   ; Utils
-   ; TODO Only with test?
-   ; Move into separate package?
-  ppxlib
-  atdgen
+   json-data-encoding
+   ppxlib
+   atdgen
 
   (ppx_expect (and :with-test (>= v0.15.1)))
-  (tezt :with-test)
-  ))
+  (tezt :with-test)))
