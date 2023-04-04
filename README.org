@@ -1,4 +1,4 @@
-#+title: OopenAI utilities
+#+title: OooapI: OCaml of OpenAPI
 
 * Constructing OCaml
 
