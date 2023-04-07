@@ -10,6 +10,7 @@ bug-reports: "https://github.com/shonfeder/ooopai/issues"
 depends: [
   "dune" {>= "2.9" & > "2.9"}
   "ocaml" {>= "5.0"}
+  "json-data-encoding"
   "ppxlib"
   "atdgen"
   "ppx_expect" {with-test & >= "v0.15.1"}
