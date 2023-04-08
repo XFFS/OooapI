@@ -1,3 +1,3 @@
 [submodule "json-data-encoding"]
 	path = json-data-encoding
-	url = git@github.com:XFFS/json-data-encoding.git
+	url = https://github.com/XFFS/json-data-encoding.git
