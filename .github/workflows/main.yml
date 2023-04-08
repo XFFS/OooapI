@@ -32,6 +32,9 @@ jobs:
 
       - run: opam install . --deps-only --with-test
 
+      - name: Add git submodules
+        run: git submodule update --init --recursive
+
       - run: opam exec -- dune build
 
       - run: opam exec -- dune runtest
