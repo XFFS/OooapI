@@ -25,6 +25,14 @@ match Openapi_spec.of_json json with
 | Ok _ -> unit
 | Error (`Msg err) -> Test.fail "parse failure: %s" err
 | exception exn -> Test.fail "exception while paring: %S" (Printexc.to_string exn)
+;;
+
+test "can parse tictactoe example spec" @@ fun () ->
+let json = In_channel.(with_open_text "tictactoe.json" input_all) in
+match Openapi_spec.of_json json with
+| Ok _ -> unit
+| Error (`Msg err) -> Test.fail "parse failure: %s" err
+| exception exn -> Test.fail "exception while paring: %S" (Printexc.to_string exn)
 
 let () =
   Test.run ()

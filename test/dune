@@ -1,7 +1,8 @@
 (tests
  (names test_parse_openai_spec)
  (libraries openapi_spec tezt)
- (deps openapi-openai.json))
+ (deps openapi-openai.json
+       tictactoe.json))
 
 (cram
  (deps %{bin:oooapi}))

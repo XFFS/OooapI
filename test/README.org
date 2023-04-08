@@ -1,0 +1,6 @@
+#+title: Readme
+
+* Fixtures
+
+- https://github.com/OAI/Documentation/blob/main/examples/tictactoe.yaml
+- https://github.com/openai/openai-openapi
