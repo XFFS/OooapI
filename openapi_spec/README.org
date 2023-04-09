@@ -1,0 +1,4 @@
+#+title: Openapi_spec
+
+A (partial) representation of the OpenAPI spec in OCaml, generated from the
+[[file:openapi.atd][ATD model.]]

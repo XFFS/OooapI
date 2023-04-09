@@ -1,4 +1,4 @@
-  $ oooapi
+  $ oooapi openapi-openai.json
   module OpenAI_api =
     struct
       let start_chat = Client.request "chat" "mydata"
