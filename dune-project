@@ -14,11 +14,11 @@
  (description "Longer description")
  (depends
   (dune (> 2.9))
-  (ocaml (>= 5.0))
 
   (atdgen (>= 2.11.0))
   (ppxlib (>= 0.28.0))
   (camelsnakekebab (>= 0.4))
+  (datalog (>= 0.6))
   ; Currently just used for its dependencies, because we
   ; are vendoring the source
   (json-data-encoding (>= 0.12.1))
@@ -32,12 +32,10 @@
  (description "Longer description")
  (depends
   (dune (> 2.9))
-  (ocaml (>= 5.0))
 
   (atdgen (>= 2.11.0))
   (ppxlib (>= 0.28.0))
   (camelsnakekebab (>= 0.4))
-  (datalog (>= 0.6))
   ; Currently just used for its dependencies, because we
   ; are vendoring the source
   (json-data-encoding (>= 0.12.1))

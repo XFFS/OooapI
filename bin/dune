@@ -1,8 +1,4 @@
 (executable
- (name oooapi)
  (public_name oooapi)
- (libraries openapi_spec
-            compiler-libs
-            ppxlib
-            )
- (preprocess (pps ppxlib.metaquot)))
+ (package oooapi)
+ (libraries oooapi))
