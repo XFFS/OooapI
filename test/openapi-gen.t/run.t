@@ -1,7 +1,2 @@
-  $ oooapi openapi-openai.json
-  module OpenAI_api =
-    struct
-      let start_chat = Client.request "chat" "mydata"
-      let end_chat = Client.request "chat/end" "foo"
-      let completion = Client.request "complete" "mycompletiondata"
-    end
+  $ oooapi openapi-openai.json > openapi_lib.ml
+  $ dune build

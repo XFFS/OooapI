@@ -1,5 +1,5 @@
 (library
- (name openapi_spec)
+ (public_name openapi_spec)
  (libraries atdgen json-data-encoding))
 
 (rule
