@@ -1,0 +1,9 @@
+(library
+ (public_name oooapi)
+ (libraries
+  openapi_spec
+  compiler-libs
+  ppxlib
+  camelsnakekebab
+  datalog.caml_interface)
+ (preprocess (pps ppxlib.metaquot)))
