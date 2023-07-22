@@ -16,7 +16,6 @@ let actual =
   |> List.fold_left (fun g (src, dst) -> G.add_arc ~src ~dst g) G.empty
   |> G.topological_sort
 in
-List.iter (Printf.printf "%i, ") actual;
 Check.(
   (actual = [ 4; 0; 5; 1; 2; 3 ])
     (list int)
