@@ -8,24 +8,26 @@ module Ast = Ast_builder.Make (struct
   let loc = loc
 end)
 
-(* let context = Extension.Context.module_expr *)
-(* let name = "openapi.client" *)
-type endpoint = string * string * string
 
 (** An AST node for a name v *)
 let n v = Ast.Located.mk v
 
 (** Construct the AST node of an endpoint function *)
-let endpoint (fname, uri, data) : structure_item =
-  let function_name = Ast.ppat_var (n fname) in
-  let uri = Ast.estring uri in
-  let data = Ast.estring data in
-  [%stri let [%p function_name] = Client.request [%e uri] [%e data]]
+(* let endpoint (fname, uri, data) : structure_item = *)
+(*   let function_name = Ast.ppat_var (n fname) in *)
+(*   let uri = Ast.estring uri in *)
+(*   let data = Ast.estring data in *)
+(*   [%stri let [%p function_name] = Client.request [%e uri] [%e data]] *)
+
+let path_to_fun : Openapi_spec.path * Openapi_spec.path_item -> structure_item list =
+  fun (_path, _desc) ->
+  []
+  (* failwith "TODO convert path parts to endpoints: one path can yield multiple endpoint funs cause of multiple methods" *)
 
 (** Construct the AST node of the module with all endpoint functions *)
-let endpoint_module : endpoint list -> structure_item =
+let endpoint_module : Openapi_spec.paths -> structure_item =
  fun endpoints ->
-  let expr = endpoints |> List.map endpoint |> Ast.pmod_structure in
+  let expr = endpoints |> List.map path_to_fun |> List.flatten |> Ast.pmod_structure in
   Ast.module_binding ~name:(n (Some "Endpoint")) ~expr |> Ast.pstr_module
 
 (* TODO Account for constraints, like pattern, min/max format etc.?
@@ -394,7 +396,4 @@ let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
   modules
     (to_module_name spec.info.title)
     spec.components
-    [ ("start_chat", "chat", "mydata")
-    ; ("end_chat", "chat/end", "foo")
-    ; ("completion", "complete", "mycompletiondata")
-    ]
+    (Option.value ~default:[] spec.paths)
