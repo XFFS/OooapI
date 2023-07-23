@@ -345,31 +345,34 @@ let schema_deps : Json_schema.schema -> string list =
 module Graph = DAG.Make (String)
 
 let data_module (components : Openapi_spec.components option) =
-  (* let type_name = Ast.ppat_var (var "data_type") in *)
   let name = Ast.Located.mk (Some "Data") in
   let expr =
     let structure_items =
-      match components with
-      | Some { schemas = Some schemas; _ } ->
-          let dep_ordering =
-            schemas
-            |> List.fold_left
-                 (fun graph (src, schema) ->
-                   schema_deps schema
-                   |> List.fold_left
-                        (fun graph' dst -> Graph.add_arc ~src ~dst graph')
-                        graph)
-                 Graph.empty
-            |> Graph.topological_sort
-            |> List.rev
-          in
-          let sorted_schemas =
-            List.map
-              (fun label -> (label, List.assoc label schemas))
-              dep_ordering
-          in
-          List.map data_module_of_schema_entry sorted_schemas
-      | _ -> []
+      let schemas =
+        match components with
+        | None -> []
+        | Some c -> c.schemas |> Option.value ~default:[]
+      in
+      let dep_ordering =
+        let dep_graph =
+          (* Build a debendency graph of each component *)
+          schemas
+          |> ListLabels.fold_left
+               ~init:Graph.empty
+               ~f:(* Add each schema to the graph *)
+               (fun graph (src, schema) ->
+                 schema
+                 |> schema_deps
+                 |> ListLabels.fold_left
+                      ~init:graph
+                      ~f:(* Add each of the schema's dependencies as nodes *)
+                      (fun graph' dst -> Graph.add_arc ~src ~dst graph'))
+        in
+        dep_graph |> Graph.topological_sort |> List.rev
+      in
+      dep_ordering
+      |> List.map (fun label ->
+             data_module_of_schema_entry (label, List.assoc label schemas))
     in
     Ast.pmod_structure structure_items
   in
