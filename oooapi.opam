@@ -15,6 +15,7 @@ depends: [
   "datalog" {>= "0.6"}
   "json-data-encoding" {>= "0.12.1"}
   "ppx_expect" {with-test & >= "v0.15.1"}
+  "cohttp-lwt-unix" {with-test}
   "tezt" {with-test}
   "odoc" {with-doc}
 ]

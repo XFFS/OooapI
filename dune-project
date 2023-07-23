@@ -24,6 +24,7 @@
   (json-data-encoding (>= 0.12.1))
 
   (ppx_expect (and :with-test (>= v0.15.1)))
+  (cohttp-lwt-unix :with-test)
   (tezt :with-test)))
 
 (package
