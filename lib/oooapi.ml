@@ -215,7 +215,6 @@ let type_declarations_of_schema : Openapi_spec.schema -> type_declaration list =
     let type_decl_of_object : Json_schema.object_specs -> type_declaration =
       let record_label :
           string * Json_schema.element * bool * _ -> label_declaration =
-       (* TODO Account for required vs. optional fields (optional must be in `option`) *)
        fun (field_name, element, required, _) ->
         let fname = to_identifier field_name in
         let pld_type =
