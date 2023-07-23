@@ -1,5 +1,4 @@
 open Ppxlib
-
 module DAG = DAG
 
 let loc = Location.in_file "ooo_spec_gen.ml"
@@ -7,7 +6,6 @@ let loc = Location.in_file "ooo_spec_gen.ml"
 module Ast = Ast_builder.Make (struct
   let loc = loc
 end)
-
 
 (** An AST node for a name v *)
 let n v = Ast.Located.mk v
@@ -19,15 +17,17 @@ let n v = Ast.Located.mk v
 (*   let data = Ast.estring data in *)
 (*   [%stri let [%p function_name] = Client.request [%e uri] [%e data]] *)
 
-let path_to_fun : Openapi_spec.path * Openapi_spec.path_item -> structure_item list =
-  fun (_path, _desc) ->
-  []
-  (* failwith "TODO convert path parts to endpoints: one path can yield multiple endpoint funs cause of multiple methods" *)
+let path_to_fun :
+    Openapi_spec.path * Openapi_spec.path_item -> structure_item list =
+ fun (_path, _desc) -> []
+(* failwith "TODO convert path parts to endpoints: one path can yield multiple endpoint funs cause of multiple methods" *)
 
 (** Construct the AST node of the module with all endpoint functions *)
 let endpoint_module : Openapi_spec.paths -> structure_item =
  fun endpoints ->
-  let expr = endpoints |> List.map path_to_fun |> List.flatten |> Ast.pmod_structure in
+  let expr =
+    endpoints |> List.map path_to_fun |> List.flatten |> Ast.pmod_structure
+  in
   Ast.module_binding ~name:(n (Some "Endpoint")) ~expr |> Ast.pstr_module
 
 (* TODO Account for constraints, like pattern, min/max format etc.?
@@ -226,18 +226,27 @@ let type_declarations_of_schema : Openapi_spec.schema -> type_declaration list =
             [%type: [%t field_type] option]
         in
         let pld_attributes =
-          if OcamlBuiltins.is_keyword field_name then
-            (* ppx_json_conv *)
-            [ attr_str ~name:"key" field_name ]
-          else
-            []
-            @
+          let doc_attr =
+            match element.description with
+            | None -> []
+            | Some d -> [ attr_str ~name:"ocaml.doc" d ]
+          in
+          let key_attr =
+            if OcamlBuiltins.is_keyword field_name then
+              (* ppx_json_conv *)
+              [ attr_str ~name:"key" field_name ]
+            else
+              []
+          in
+          let qualifier_attrs =
             if required then
               (* ppx_make *)
               [ attr ~name:"required" ]
             else
               (* ppx_json_conv *)
               [ attr_ident ~name:"default" "None" ]
+          in
+          doc_attr @ key_attr @ qualifier_attrs
         in
         { pld_type
         ; pld_attributes
