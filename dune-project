@@ -26,6 +26,7 @@
   (ppx_expect (and :with-test (>= v0.15.1)))
   (cohttp-lwt-unix :with-test)
   (ppx_deriving_yojson :with-test)
+  (ppx_deriving :with-test)
   (tezt :with-test)))
 
 (package
