@@ -3,3 +3,4 @@
 _build/
 # Opam switch directory
 _opam/
+.envrc
