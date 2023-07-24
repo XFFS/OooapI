@@ -7,7 +7,7 @@ val to_json : t -> string
 val from_file : string -> (t, [`Msg of string]) Result.t
 
 module Openapi_path : sig
-  type t
+  type t = path
   val params : t -> string list
   val of_string : string -> t
   val to_string : t -> string

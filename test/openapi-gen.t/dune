@@ -1,3 +1,12 @@
 (library
- (name openapi_lib)
- (libraries yojson))
+ (name openai_api)
+ (modules openai_api)
+ (libraries yojson
+            cohttp-lwt-unix)
+ (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
+
+(executable
+ (public_name test_openai)
+ (name main)
+ (modules main)
+ (libraries openai_api cohttp-lwt-unix))

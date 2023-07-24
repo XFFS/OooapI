@@ -1,2 +1,3 @@
-  $ oooapi openapi-openai.json > openapi_lib.ml
+  $ oooapi openapi-openai.json > openai_api.ml
   $ dune build
+  $ OCAMLRUNPARAM=b dune exec test_openai
