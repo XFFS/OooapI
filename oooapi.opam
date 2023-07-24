@@ -14,10 +14,12 @@ depends: [
   "camelsnakekebab" {>= "0.4"}
   "datalog" {>= "0.6"}
   "json-data-encoding" {>= "0.12.1"}
-  "ppx_expect" {with-test & >= "v0.15.1"}
   "cohttp-lwt-unix" {with-test}
+  "tls" {with-test}
+  "tls-lwt" {with-test}
   "ppx_deriving_yojson" {with-test}
   "ppx_deriving" {with-test}
+  "ppx_expect" {with-test & >= "v0.15.1"}
   "tezt" {with-test}
   "odoc" {with-doc}
 ]

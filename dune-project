@@ -23,10 +23,14 @@
   ; are vendoring the source
   (json-data-encoding (>= 0.12.1))
 
-  (ppx_expect (and :with-test (>= v0.15.1)))
+  ; end to end test deps
   (cohttp-lwt-unix :with-test)
+  (tls :with-test)
+  (tls-lwt :with-test)
   (ppx_deriving_yojson :with-test)
   (ppx_deriving :with-test)
+
+  (ppx_expect (and :with-test (>= v0.15.1)))
   (tezt :with-test)))
 
 (package
