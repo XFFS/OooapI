@@ -5,8 +5,14 @@
             cohttp-lwt-unix)
  (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
 
+(rule
+ (target openai_api.ml)
+ (deps %{bin:oooapi} openapi-openai.json)
+ (action
+  (progn
+   (with-stdout-to openai_api.ml (run oooapi openapi-openai.json)))))
+
 (executable
- (public_name test_openai)
- (name main)
- (modules main)
+ (name test_openai)
+ (modules test_openai)
  (libraries openai_api cohttp-lwt-unix))
