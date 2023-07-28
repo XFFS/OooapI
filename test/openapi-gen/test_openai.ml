@@ -1,7 +1,6 @@
-let api_key = Sys.getenv "OPENAI_API_KEY"
-
-module Config = struct
-  let default_headers = Cohttp.Header.add Cohttp.Header.(init ()) "Authorization" ("Bearer " ^ api_key)
+module Config : Openai_api.Config = struct
+  let default_headers = None
+  let bearer_token = Sys.getenv_opt "OPENAI_API_KEY"
 end
 
 module Api = Openai_api.Endpoint (Config)
@@ -12,10 +11,8 @@ let main =
   let* () = Lwt_io.printl "" in
   match res with
   | Error (_, s) ->
-    let* () = Lwt_io.printl "Bad!" in
-    Lwt_io.printl s
-  | Ok _ ->
-    Lwt_io.printl "Ok!"
+      let* () = Lwt_io.printl "Bad!" in
+      Lwt_io.printl s
+  | Ok _ -> Lwt_io.printl "Ok!"
 
-let () =
-  Lwt_main.run main
+let () = Lwt_main.run main
