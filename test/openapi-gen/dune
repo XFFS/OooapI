@@ -1,8 +1,13 @@
+; TODO: Generate as part of portable component
 (library
  (name openai_api)
  (modules openai_api)
  (libraries yojson
-            cohttp-lwt-unix)
+            cohttp-lwt-unix
+            multipart_form
+            multipart_form-lwt
+            multipart_form-cohttp-lwt
+            uuidm)
  (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
 
 (rule

@@ -247,8 +247,7 @@ module DataModule = struct
         |> List.map (fun label ->
                data_module_of_schema_entry (label, List.assoc label schemas))
       in
-      (* Disabling warning 60 allows duplicate field names in records *)
-      Ast.pmod_structure ([%stri [@@@warning "-30"]] :: structure_items)
+      Ast.pmod_structure structure_items
     in
 
     Ast.module_binding ~name ~expr |> Ast.pstr_module
@@ -451,7 +450,8 @@ module EndpointsModule = struct
       | Some s ->
       match ref_of_schema s with
       | None -> failwith ("only Ref_def supported for Json currently :" ^ name)
-      | Some name -> ([%expr Some ([%e to_json_fun name], data)], [%pat? data])
+      | Some name ->
+          ([%expr Some (`Json ([%e to_json_fun name] data))], [%pat? data])
     and from_multipart = function
       | None -> failwith ("Content type is missing schema: " ^ name)
       | _ -> ([%expr None], [%pat? ()])
@@ -461,7 +461,8 @@ module EndpointsModule = struct
     | None -> ([%expr None], [%pat? ()])
     | Some body ->
     match body with
-    | `Ref r -> ([%expr Some ([%e to_json_fun r.ref_], data)], [%pat? data])
+    | `Ref r ->
+        ([%expr Some (`Json ([%e to_json_fun r.ref_] data))], [%pat? data])
     | `Obj o ->
     match List.assoc_opt "application/json" o.content with
     | Some media_type -> from_json media_type.schema
@@ -489,15 +490,14 @@ module EndpointsModule = struct
     in
     [%stri let [%p name] = [%e fun_with_params ~data:Ast.punit params body]]
 
-
   (* multipart:
 
+     - abstract function parts -> form
      - post_fun also requires components
      - check that path requires multipart
      - if so, we need to examine component:
        - all properties of component become params to function
-     - each param needs a conversion function, either converting to string or, if format is binary, reading a file from dist
-     - each part is a `part option`
+     - each param needs must be prepared as a part option (string of file path)
      - concat all present parts into list and bass to Multipart form
       - construct header and body from form, then add all header stuff to header
   *)
@@ -530,83 +530,21 @@ module EndpointsModule = struct
   (** Construct the AST node of the module with all endpoint functions *)
   let of_paths : string * Openapi_spec.paths -> structure_item list =
    fun (base_uri, endpoints) ->
-    let client_config_sig =
-      Ast.pmty_signature
-        [%sig:
-          [@@@warning "-32"]
-
-          val bearer_token : string option
-          (* Bearer token added to as Authorization on the header *)
-
-          val default_headers : Cohttp.Header.t option
-          (** Headers to be appended to every request
-
-            Can be used, e.g., to supply bearer tokens. *)]
-    in
     let endpoint_functor =
-      let functor_param = Named (n (Some "Config"), client_config_sig) in
+      let functor_param =
+        Named
+          ( n (Some "Config")
+          , Ast.pmty_ident (n (Astlib.Longident.parse "Config")) )
+      in
       let mod_impl =
         let decls =
-          [ [%stri let base_uri = [%e Ast.estring base_uri]]
-          ; [%stri
-              let default_headers =
-                let headers =
-                  match Config.default_headers with
-                  | None -> Cohttp.Header.init ()
-                  | Some hs -> hs
-                in
-                match Config.bearer_token with
-                | None -> headers
-                | Some token ->
-                    Cohttp.Header.add headers "Authorization" ("Bearer " ^ token)]
-          ; [%stri
-              type request_err =
-                [ `Request of Cohttp.Code.status_code * string
-                | `Deseriaization of string * string
-                ]]
-          ; [%stri type 'a request_result = ('a, request_err) result Lwt.t]
-          ; [%stri let of_json_string f s = f (Yojson.Safe.from_string s)]
-          ; [%stri
-              let make_request
-                  ?(data : (('req -> Yojson.Safe.t) * 'req) option)
-                  ~(path : string list)
-                  ~(params : (string * string) list)
-                  ~(headers : (string * string) list)
-                  ~(decode : string -> ('resp, string) result)
-                  (meth : Cohttp.Code.meth) : 'resp request_result =
-                let body =
-                  match data with
-                  | None -> None
-                  | Some (to_json, d) ->
-                      let data_json = to_json d in
-                      let data_str = Yojson.Safe.to_string data_json in
-                      let data_body = Cohttp_lwt.Body.of_string data_str in
-                      Some data_body
-                in
-                let uri =
-                  let path_parts = base_uri :: path in
-                  let uri_str = String.concat "/" path_parts in
-                  let base_uri = Uri.of_string uri_str in
-                  Uri.add_query_params' base_uri params
-                in
-                let req_headers =
-                  Cohttp.Header.add_list default_headers headers
-                in
-                let open Lwt.Syntax in
-                let* resp, body =
-                  Cohttp_lwt_unix.Client.call
-                    ~headers:req_headers
-                    ?body
-                    meth
-                    uri
-                in
-                let+ resp_body_str = Cohttp_lwt.Body.to_string body in
-                match resp.status with
-                | `OK -> (
-                    match decode resp_body_str with
-                    | Ok resp_data -> Ok resp_data
-                    | Error e -> Error (`Deseriaization (resp_body_str, e)))
-                | other -> Error (`Request (other, resp_body_str))]
+          [ [%stri
+              include
+                EndpointLib
+                  (struct
+                    let uri = [%e Ast.estring base_uri]
+                  end)
+                  (Config)]
           ]
         in
         let endpoint_functions =
@@ -616,16 +554,12 @@ module EndpointsModule = struct
       in
       Ast.pmod_functor functor_param mod_impl
     in
-    [ Ast.module_type_declaration
-        ~name:(n "Config")
-        ~type_:(Some client_config_sig)
-      |> Ast.pstr_modtype
-    ; Ast.module_binding ~name:(n (Some "Endpoint")) ~expr:endpoint_functor
-      |> Ast.pstr_module
-    ]
+    Oooapi_lib.endpoint
+    @ [ Ast.module_binding ~name:(n (Some "Endpoint")) ~expr:endpoint_functor
+        |> Ast.pstr_module
+      ]
 end
 
-(* TODO: name and endpoints to become all data from OpenAPI spec *)
 let modules components server_endpoints =
   DataModule.of_components components
   :: EndpointsModule.of_paths server_endpoints
@@ -639,6 +573,19 @@ let write_ast_f fmt str =
 
 let write_ast str = write_ast_f Format.std_formatter str
 
+let notice () =
+  let Unix.{ tm_sec; tm_min; tm_hour; tm_mday; tm_mon; tm_year; _ } =
+    Unix.time () |> Unix.gmtime
+  in
+  Printf.sprintf
+    "Generated by oooapi at %i-%i-%iT%i:%i:%iZ"
+    (tm_year + 1900)
+    (tm_mon + 1)
+    tm_mday
+    tm_hour
+    tm_min
+    tm_sec
+
 let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
  fun spec ->
   let base_uri =
@@ -648,4 +595,6 @@ let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
         failwith "No servers specified"
     | Some (s :: _) -> s
   in
-  modules spec.components (base_uri.url, Option.value ~default:[] spec.paths)
+  [%stri let __NOTE__ = [%e Ast.estring (notice ())]]
+  :: DataModule.of_components spec.components
+  :: EndpointsModule.of_paths (base_uri.url, Option.value ~default:[] spec.paths)
