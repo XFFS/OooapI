@@ -370,43 +370,9 @@ module EndpointsModule = struct
 
   let data_module_fun_name name f = Printf.sprintf "Data.%s.%s" name f
 
-  let to_cohttp_body mod_name : expression =
+  let to_json_fun mod_name : expression =
     let mod_name = Camelsnakekebab.upper_camel_case mod_name in
-    let to_json = Ast.evar (data_module_fun_name mod_name "to_yojson") in
-    [%expr
-      let data_json = [%e to_json] data in
-      let data_str = Yojson.Safe.to_string data_json in
-      let data_body = Cohttp_lwt.Body.of_string data_str in
-      Some data_body]
-
-  (* TODO make request, decode, and return error value *)
-  let response_conversion (operation : Openapi_spec.operation) :
-      expression * [ `Content of string | `Unsupported ] =
-    let unsupported = ([%expr fun x -> Ok x], `Unsupported) in
-    match operation.responses |> List.assoc_opt "200" with
-    | None ->
-        (* https://spec.openapis.org/oas/v3.1.0#responses-object *)
-        failwith "Invalid schema: no 200 response"
-    | Some r ->
-    match Option.bind r.content (List.assoc_opt "application/json") with
-    | None -> unsupported
-    | Some m ->
-    match m.schema with
-    | None -> unsupported
-    | Some s ->
-    match (Json_schema.root s).kind with
-    | Def_ref p ->
-        let mod_name = DataModule.module_name_of_def_ref p in
-        let conv_fun = Ast.evar (data_module_fun_name mod_name "of_yojson") in
-        ( [%expr
-            fun resp_str ->
-              let resp_json = Yojson.Safe.from_string resp_str in
-              match [%e conv_fun] resp_json with
-              | Ok d -> Ok d
-              | Error e -> Error (`Deseriaization (resp_str, e))]
-        , `Content "application/json" )
-    (* TODO handle other schemas gracefully *)
-    | _ -> unsupported
+    Ast.evar (data_module_fun_name mod_name "to_yojson")
 
   let response_decoder (operation : Openapi_spec.operation) :
       expression * [ `Content of string | `Unsupported ] =
@@ -430,27 +396,6 @@ module EndpointsModule = struct
     (* TODO handle other schemas gracefully *)
     | _ -> unsupported
 
-  let let_uri path (params : Params.t) =
-    let parts_list =
-      path
-      |> List.map (function
-             | `C c -> Ast.estring c
-             | `P p -> Ast.evar p)
-      |> Ast.elist
-    in
-    let query_params =
-      params.query
-      |> List.map (fun Params.{ name; as_string; _ } ->
-             [%expr [%e Ast.estring name], [%e as_string]])
-      |> Ast.elist
-    in
-    ( [%pat? uri]
-    , [%expr
-        let path_parts = base_uri :: [%e parts_list] in
-        let uri_str = String.concat "/" path_parts in
-        let base_uri = Uri.of_string uri_str in
-        Uri.add_query_params' base_uri [%e query_params]] )
-
   let path_parts path : expression =
     path
     |> List.map (function
@@ -463,20 +408,6 @@ module EndpointsModule = struct
     |> List.map (fun Params.{ name; as_string; _ } ->
            [%expr [%e Ast.estring name], [%e as_string]])
     |> Ast.elist
-
-  let let_headers content (params : Params.t) =
-    let header_params =
-      (match content with
-      | `Unsupported -> []
-      | `Content c ->
-          [ [%expr [%e Ast.estring "Content-Type"], [%e Ast.estring c]] ])
-      @ (params.header
-        |> List.map (fun (p : Params.param) ->
-               [%expr [%e Ast.estring p.name], [%e p.as_string]]))
-      |> Ast.elist
-    in
-    ( [%pat? headers]
-    , [%expr Cohttp.Header.add_list default_headers [%e header_params]] )
 
   let extra_headers content (params : Params.param list) : expression =
     let content_type =
@@ -505,18 +436,41 @@ module EndpointsModule = struct
              param.pat
              body')
 
-  (* an expression to execute and handle an HTTP request *)
-  let request_expr : make_req:expression -> decode_resp:expression -> expression
-      =
-   fun ~make_req ~decode_resp ->
-    [%expr
-      let open Lwt.Syntax in
-      let* resp, body = [%e make_req] in
-      let+ bodystr = Cohttp_lwt.Body.to_string body in
-      let decode_response = [%e decode_resp] in
-      match resp.status with
-      | `OK -> decode_response bodystr
-      | other -> Error (`Request (other, bodystr))]
+  (* Extract the Ref path from a schema, if it has one *)
+  let ref_of_schema : Json_schema.schema -> string option =
+   fun s ->
+    match (Json_schema.root s).kind with
+    | Def_ref path -> Some (DataModule.json_query_path_terminal path)
+    | _ -> None
+
+  let data_conv_and_param ?(name = "<no operation id>") :
+         Openapi_spec.request_body Openapi_spec.or_ref option
+      -> expression * pattern =
+    let from_json = function
+      | None -> failwith ("Content type is missing schema: " ^ name)
+      | Some s ->
+      match ref_of_schema s with
+      | None -> failwith ("only Ref_def supported for Json currently :" ^ name)
+      | Some name -> ([%expr Some ([%e to_json_fun name], data)], [%pat? data])
+    and from_multipart = function
+      | None -> failwith ("Content type is missing schema: " ^ name)
+      | _ -> ([%expr None], [%pat? ()])
+      (* TODO *)
+    in
+    function
+    | None -> ([%expr None], [%pat? ()])
+    | Some body ->
+    match body with
+    | `Ref r -> ([%expr Some ([%e to_json_fun r.ref_], data)], [%pat? data])
+    | `Obj o ->
+    match List.assoc_opt "application/json" o.content with
+    | Some media_type -> from_json media_type.schema
+    | None ->
+    match List.assoc_opt "multipart/form-data" o.content with
+    | Some media_type -> from_multipart media_type.schema
+    | None ->
+        failwith
+          ("unsupported request body (only JSON and multipart form data)" ^ name)
 
   (** A function to make a get request *)
   let get_fun : operation_function =
@@ -535,43 +489,6 @@ module EndpointsModule = struct
     in
     [%stri let [%p name] = [%e fun_with_params ~data:Ast.punit params body]]
 
-  (* Extract the Ref path from a schema, if it has one *)
-  let ref_of_schema : Json_schema.schema -> string option =
-   fun s ->
-    match (Json_schema.root s).kind with
-    | Def_ref path -> Some (DataModule.json_query_path_terminal path)
-    | _ -> None
-
-  let request_data_arg_and_let_body ?(name = "<no operation id>") :
-         Openapi_spec.request_body Openapi_spec.or_ref option
-      -> pattern * (pattern * expression) =
-    let from_json = function
-      | None -> failwith ("Content type is missing schema: " ^ name)
-      | Some s ->
-      match ref_of_schema s with
-      | None -> failwith ("only Ref_def supported for Json currently :" ^ name)
-      | Some name ->
-          ([%pat? data], ([%pat? body], [%expr [%e to_cohttp_body name]]))
-    and from_multipart = function
-      | None -> failwith ("Content type is missing schema: " ^ name)
-      | _ -> (Ast.punit, ([%pat? body], [%expr None]))
-      (* TODO *)
-    in
-    function
-    | None -> (Ast.punit, ([%pat? body], [%expr None]))
-    | Some body ->
-    match body with
-    | `Ref r ->
-        ([%pat? data], ([%pat? body], [%expr [%e to_cohttp_body r.ref_]]))
-    | `Obj o ->
-    match List.assoc_opt "application/json" o.content with
-    | Some media_type -> from_json media_type.schema
-    | None ->
-    match List.assoc_opt "multipart/form-data" o.content with
-    | Some media_type -> from_multipart media_type.schema
-    | None ->
-        failwith
-          ("unsupported request body (only JSON and multipart form data)" ^ name)
 
   (* multipart:
 
@@ -586,23 +503,23 @@ module EndpointsModule = struct
   *)
   let post_fun : operation_function =
    fun path operation ->
-    let open AstExt in
     let name = operation_function_name operation path in
-    let data, let_body =
-      request_data_arg_and_let_body
-        ?name:operation.operationId
-        operation.requestBody
+    let data_conv, data_param =
+      data_conv_and_param ?name:operation.operationId operation.requestBody
     in
     let params = Params.of_openapi_parameters operation.parameters in
-    let decode_resp, content = response_conversion operation in
-    let make_req = [%expr Cohttp_lwt_unix.Client.post ~headers ?body uri] in
+    let decode_resp, content = response_decoder operation in
     let body =
-      Exp.lets
-        [ let_body; let_uri path params; let_headers content params ]
-        (request_expr ~make_req ~decode_resp)
+      [%expr
+        make_request
+          ?data:[%e data_conv]
+          ~path:[%e path_parts path]
+          ~params:[%e query_params params.query]
+          ~headers:[%e extra_headers content params.header]
+          ~decode:[%e decode_resp]
+          `POST]
     in
-    let fun_expr = fun_with_params ~data params body in
-    [%stri let [%p name] = [%e fun_expr]]
+    [%stri let [%p name] = [%e fun_with_params ~data:data_param params body]]
 
   let endpoint :
       Openapi_spec.path * Openapi_spec.path_item -> structure_item list =
