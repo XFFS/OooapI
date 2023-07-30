@@ -24,6 +24,11 @@
   (json-data-encoding (>= 0.12.1))
 
   ; end to end test deps
+
+  (multipart_form (and :with-test (>= 0.5.0)))
+  (multipart_form-lwt (and :with-test (>= 0.5.0)))
+  (multipart_form-cohttp-lwt (and :with-test (>= 0.5.0)))
+  (uuidm :with-test)
   (cohttp-lwt-unix :with-test)
   (tls :with-test)
   (tls-lwt :with-test)
