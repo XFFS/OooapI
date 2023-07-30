@@ -8,10 +8,12 @@ module Make (O : Map.OrderedType) = struct
 
   let empty = Edges.empty
   let is_empty t = Edges.is_empty t
-
   let nodes t = t |> Edges.to_seq |> Seq.map (fun (k, _) -> k) |> Nodes.of_seq
+
   let roots t =
-    let child_nodes = Edges.fold (fun _ cs acc -> Nodes.union acc cs) t Nodes.empty in
+    let child_nodes =
+      Edges.fold (fun _ cs acc -> Nodes.union acc cs) t Nodes.empty
+    in
     nodes t |> Nodes.filter (fun n -> not (Nodes.mem n child_nodes))
 
   let arcs_to ~src ~dst t =
@@ -35,6 +37,13 @@ module Make (O : Map.OrderedType) = struct
     |> Edges.update src (function
            | None -> Some (Nodes.singleton dst)
            | Some cs -> Some (Nodes.add dst cs))
+
+  let add_arcs ~src dsts t =
+    match dsts with
+    | [] -> add_node src t
+    | _ :: _ ->
+        dsts
+        |> ListLabels.fold_left ~init:t ~f:(fun g dst -> add_arc ~src ~dst g)
 
   let remove_arc ~src ~dst t =
     t |> Edges.update src (Option.map (Nodes.remove dst))

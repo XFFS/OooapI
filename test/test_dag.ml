@@ -3,6 +3,18 @@ open Tezt.Base
 
 let test ?(tags = [ "dag" ]) title f = Test.register ~__FILE__ ~title ~tags f;;
 
+test "add_arcs ~src [] ensures src is added to graph" @@ fun () ->
+let module G = Oooapi.DAG.Make (Int) in
+let nodes =
+  G.empty |> G.add_arcs ~src:0 [] |> G.nodes |> G.Nodes.to_seq |> List.of_seq
+in
+Check.(
+  (nodes = [ 0 ])
+    (list int)
+    ~error_msg:"expected the node 0 to be the sole node in the graph");
+unit
+;;
+
 test "can topo sort dag" @@ fun () ->
 let module G = Oooapi.DAG.Make (Int) in
 (*
