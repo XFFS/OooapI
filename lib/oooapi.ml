@@ -259,29 +259,98 @@ module EndpointsModule = struct
       { name : string
       ; var : expression
       ; pat : pattern
-      ; as_string : expression
+      ; to_string : expression
       ; optional : bool
       ; default : expression option
+      ; format : string option (* E.g., "binary" *)
       }
 
     type t =
       { query : param list
       ; path : param list
       ; header : param list
+      ; form : param list
       }
 
-    let empty = { query = []; path = []; header = [] }
+    let empty = { query = []; path = []; header = []; form = [] }
+    let to_list { query; path; header; form } = query @ path @ header @ form
+
+    let param_of_element :
+        name:string -> optional:bool -> Json_schema.element -> param =
+     fun ~name ~optional elem ->
+      let var = Ast.evar (AstExt.to_identifier name) in
+      let pat = Ast.pvar (AstExt.to_identifier name) in
+      let to_string, format =
+        match (elem.kind : Json_schema.element_kind) with
+        (* Unsupported schemas *)
+        | Id_ref _ ->
+            raise
+              (Invalid_argument
+                 "param_of_json_schema_element given id_ref schema")
+        | Ext_ref _ ->
+            raise
+              (Invalid_argument
+                 "param_of_json_schema_element given ext_ref schema")
+        | Dummy ->
+            raise
+              (Invalid_argument
+                 "param_of_json_schema_element given dummy schema")
+        | Array (_, _) ->
+            raise
+              (Invalid_argument "param_of_json_schema_element given het-array")
+        | Object _ ->
+            raise (Invalid_argument "param_of_json_schema_element given object")
+        | Def_ref _ ->
+            raise
+              (Invalid_argument "param_of_json_schema_element given def-ref")
+        | Monomorphic_array (_, _) ->
+            raise (Invalid_argument "param_of_json_schema_element given array")
+        (* Supported schemas *)
+        | Any ->
+            raise (Invalid_argument "param_of_json_schema_element given any")
+        | Combine _ ->
+            raise
+              (Invalid_argument "param_of_json_schema_element given combine")
+        | Null -> ([%expr fun _ -> "null"], None)
+        | Boolean -> ([%expr string_of_bool], None)
+        | Integer _ -> ([%expr string_of_int], None)
+        | Number _ -> ([%expr string_of_float], None)
+        | String s -> ([%expr fun x -> x], s.str_format)
+      in
+      let default =
+        elem.default
+        |> Option.map (Json_repr.any_to_repr (module Json_repr.Yojson))
+        |> Option.map (function
+               | `String s -> Ast.estring s
+               | `Bool b -> Ast.ebool b
+               | `Int i -> (
+                   (* JS doesn't distinguish between `Number` "types", so we have be sure we
+                      decode the default correctly in case it is given in an integral form when
+                      it should be a float. *)
+                   match elem.kind with
+                   | Number _ -> Ast.efloat (string_of_float (float_of_int i))
+                   | _ -> Ast.eint i)
+               | `Float f -> Ast.efloat (string_of_float f)
+               | unsupported_default ->
+                   failwith
+                     (Printf.sprintf
+                        "default value %s not supported for parameter  %s"
+                        (Yojson.Safe.to_string unsupported_default)
+                        name))
+      in
+      { name; var; pat; optional; default; to_string; format }
 
     let of_openapi_parameter : Openapi_spec.parameter -> param =
      fun p ->
       let var = Ast.evar p.name in
       let pat = Ast.pvar p.name in
-      let default, as_string =
+      let optional = not p.required in
+      let default, to_string =
         match p.schema with
         (* TODO should the be an error? Or is defaulting to string right? *)
         | None -> (None, var)
         | Some s ->
-            let as_string =
+            let to_string, typ =
               match DataModule.type_declarations_of_schema s with
               | [] -> failwith ("no schema specified for parameter " ^ p.name)
               | _ :: _ :: _ ->
@@ -291,10 +360,10 @@ module EndpointsModule = struct
               | None -> failwith ("unsupported type for parameter " ^ p.name)
               | Some t ->
               match t with
-              | [%type: string] -> var
-              | [%type: bool] -> [%expr string_of_bool [%e var]]
-              | [%type: int] -> [%expr string_of_int [%e var]]
-              | [%type: float] -> [%expr string_of_float [%e var]]
+              | [%type: string] -> ([%expr fun x -> x], t)
+              | [%type: bool] -> ([%expr string_of_bool], t)
+              | [%type: int] -> ([%expr string_of_int], t)
+              | [%type: float] -> ([%expr string_of_float], t)
               | unsupported_typ ->
                   failwith
                     (Printf.sprintf
@@ -308,7 +377,14 @@ module EndpointsModule = struct
               |> Option.map (function
                      | `String s -> Ast.estring s
                      | `Bool b -> Ast.ebool b
-                     | `Int i -> Ast.eint i
+                     | `Int i -> (
+                         (* JS doesn't distinguish between `Number` "types", so we have be sure we
+                            decode the default correctly in case it is given in an integral form when
+                            it should be a float. *)
+                         match typ with
+                         | [%type: float] ->
+                             Ast.efloat (string_of_float (float_of_int i))
+                         | _ -> Ast.eint i)
                      | `Float f -> Ast.efloat (string_of_float f)
                      | unsupported_default ->
                          failwith
@@ -318,15 +394,15 @@ module EndpointsModule = struct
                               (Yojson.Safe.to_string unsupported_default)
                               p.name))
             in
-            (default, as_string)
+            (default, to_string)
       in
-      let optional, default =
-        match (p.required, default) with
-        | true, _ -> (false, None)
-        | false, None -> (true, None)
-        | false, Some default_expr -> (true, Some default_expr)
+      let default =
+        if not optional then
+          None
+        else
+          default
       in
-      { name = p.name; optional; default; as_string; var; pat }
+      { name = p.name; optional; default; to_string; var; pat; format = None }
 
     let of_openapi_parameters :
         Openapi_spec.parameter Openapi_spec.or_ref list option -> t =
@@ -336,7 +412,7 @@ module EndpointsModule = struct
       | Some ps ->
           ps
           |> ListLabels.fold_right
-               ~init:{ query = []; path = []; header = [] }
+               ~init:{ query = []; path = []; header = []; form = [] }
                ~f:(fun i acc ->
                  match i with
                  | `Ref (r : Openapi_spec.reference) ->
@@ -373,9 +449,8 @@ module EndpointsModule = struct
     let mod_name = Camelsnakekebab.upper_camel_case mod_name in
     Ast.evar (data_module_fun_name mod_name "to_yojson")
 
-  let response_decoder (operation : Openapi_spec.operation) :
-      expression * [ `Content of string | `Unsupported ] =
-    let unsupported = ([%expr fun x -> Ok x], `Unsupported) in
+  let response_decoder (operation : Openapi_spec.operation) : expression =
+    let unsupported = [%expr fun x -> Ok x] in
     match operation.responses |> List.assoc_opt "200" with
     | None ->
         (* https://spec.openapis.org/oas/v3.1.0#responses-object *)
@@ -391,7 +466,7 @@ module EndpointsModule = struct
     | Def_ref p ->
         let mod_name = DataModule.module_name_of_def_ref p in
         let conv_fun = Ast.evar (data_module_fun_name mod_name "of_yojson") in
-        ([%expr of_json_string [%e conv_fun]], `Content "application/json")
+        [%expr of_json_string [%e conv_fun]]
     (* TODO handle other schemas gracefully *)
     | _ -> unsupported
 
@@ -404,27 +479,20 @@ module EndpointsModule = struct
 
   let query_params (params : Params.param list) =
     params
-    |> List.map (fun Params.{ name; as_string; _ } ->
-           [%expr [%e Ast.estring name], [%e as_string]])
+    |> List.map (fun Params.{ name; to_string; var; _ } ->
+           [%expr [%e Ast.estring name], [%e to_string] [%e var]])
     |> Ast.elist
 
-  let extra_headers content (params : Params.param list) : expression =
-    let content_type =
-      match content with
-      | `Unsupported -> []
-      | `Content c ->
-          [ [%expr [%e Ast.estring "Content-Type"], [%e Ast.estring c]] ]
-    in
-    let header_params =
-      params
-      |> List.map (fun (p : Params.param) ->
-             [%expr [%e Ast.estring p.name], [%e p.as_string]])
-    in
-    Ast.elist (content_type @ header_params)
+  let extra_headers (params : Params.param list) : expression =
+    params
+    |> List.map (fun (p : Params.param) ->
+           [%expr [%e Ast.estring p.name], [%e p.to_string] [%e p.var]])
+    |> Ast.elist
 
   let fun_with_params ~data (params : Params.t) body =
     let open AstExt in
-    params.path @ params.query @ params.header
+    params
+    |> Params.to_list
     |> ListLabels.fold_right
          ~init:(Exp.f data body) (* the last, innermost function *)
          ~f:(fun (param : Params.param) body' ->
@@ -435,6 +503,37 @@ module EndpointsModule = struct
              param.pat
              body')
 
+  let form_part_data : Params.param list -> expression =
+   fun params ->
+    let optional_part_data =
+      params
+      |> List.map (fun (param : Params.param) ->
+             let name = Ast.estring param.name in
+             (* If we have an optional param with no default, we need to map it from an option type *)
+             if param.optional && Option.is_none param.default then
+               match param.format with
+               | Some "binary" ->
+                   [%expr
+                     Option.map (fun v -> `File ([%e name], v)) [%e param.var]]
+               | _ ->
+                   [%expr
+                     Option.map
+                       (fun v -> `String ([%e name], [%e param.to_string] v))
+                       [%e param.var]]
+             else
+               match param.format with
+               | Some "binary" ->
+                   [%expr Some (`File ([%e name], [%e param.var]))]
+               | _ ->
+                   [%expr
+                     Some
+                       (`String
+                         ([%e name], [%e param.to_string] [%e param.var]))])
+      |> Ast.elist
+    in
+    (* Just take the parts that where defined *)
+    [%expr List.filter_map (fun x -> x) [%e optional_part_data]]
+
   (* Extract the Ref path from a schema, if it has one *)
   let ref_of_schema : Json_schema.schema -> string option =
    fun s ->
@@ -443,48 +542,82 @@ module EndpointsModule = struct
     | _ -> None
 
   let data_conv_and_param ?(name = "<no operation id>") :
-         Openapi_spec.request_body Openapi_spec.or_ref option
-      -> expression * pattern =
+         Openapi_spec.components
+      -> Openapi_spec.request_body Openapi_spec.or_ref option
+      -> expression * pattern * Params.param list =
     let from_json = function
       | None -> failwith ("Content type is missing schema: " ^ name)
       | Some s ->
       match ref_of_schema s with
       | None -> failwith ("only Ref_def supported for Json currently :" ^ name)
-      | Some name ->
-          ([%expr Some (`Json ([%e to_json_fun name] data))], [%pat? data])
-    and from_multipart = function
+      | Some schema_name ->
+          ( [%expr Some (`Json ([%e to_json_fun schema_name] data))]
+          , [%pat? data]
+          , [] )
+    and from_multipart (components : Openapi_spec.components) = function
       | None -> failwith ("Content type is missing schema: " ^ name)
-      | _ -> ([%expr None], [%pat? ()])
-      (* TODO *)
+      | Some s ->
+      match ref_of_schema s with
+      | None ->
+          failwith
+            ("only Ref_def supported for multipart forms currently :" ^ name)
+      | Some schema_name ->
+      match components.schemas with
+      | None ->
+          failwith
+            ("Given ref to schemas but no schemas are specified for" ^ name)
+      | Some schemas ->
+      match List.assoc_opt schema_name schemas with
+      | None ->
+          failwith
+            ("no schema exists for "
+            ^ schema_name
+            ^ " referenced in operation "
+            ^ name)
+      | Some form_data_schema ->
+      match Json_schema.(root form_data_schema).kind with
+      | Object { properties; _ } ->
+          let params =
+            properties
+            |> List.map (fun (name, elem, required, _) ->
+                   Params.param_of_element ~name ~optional:(not required) elem)
+          in
+          ( [%expr Some (`Multipart_form [%e form_part_data params])]
+          , [%pat? ()]
+          , params )
+      | _ ->
+          raise (Invalid_argument "non object as input for multipart form data")
     in
-    function
-    | None -> ([%expr None], [%pat? ()])
-    | Some body ->
-    match body with
-    | `Ref r ->
-        ([%expr Some (`Json ([%e to_json_fun r.ref_] data))], [%pat? data])
-    | `Obj o ->
-    match List.assoc_opt "application/json" o.content with
-    | Some media_type -> from_json media_type.schema
-    | None ->
-    match List.assoc_opt "multipart/form-data" o.content with
-    | Some media_type -> from_multipart media_type.schema
-    | None ->
-        failwith
-          ("unsupported request body (only JSON and multipart form data)" ^ name)
+    fun components request_body ->
+      match request_body with
+      | None -> ([%expr None], [%pat? ()], [])
+      | Some body ->
+      match body with
+      | `Ref r ->
+          ([%expr Some (`Json ([%e to_json_fun r.ref_] data))], [%pat? data], [])
+      | `Obj o ->
+      match List.assoc_opt "application/json" o.content with
+      | Some media_type -> from_json media_type.schema
+      | None ->
+      match List.assoc_opt "multipart/form-data" o.content with
+      | Some media_type -> from_multipart components media_type.schema
+      | None ->
+          failwith
+            ("unsupported request body (only JSON and multipart form data)"
+            ^ name)
 
   (** A function to make a get request *)
   let get_fun : operation_function =
    fun path operation ->
     let name = operation_function_name operation path in
     let params = Params.of_openapi_parameters operation.parameters in
-    let decode_resp, content = response_decoder operation in
+    let decode_resp= response_decoder operation in
     let body =
       [%expr
         make_request
           ~path:[%e path_parts path]
           ~params:[%e query_params params.query]
-          ~headers:[%e extra_headers content params.header]
+          ~headers:[%e extra_headers params.header]
           ~decode:[%e decode_resp]
           `GET]
     in
@@ -501,35 +634,46 @@ module EndpointsModule = struct
      - concat all present parts into list and bass to Multipart form
       - construct header and body from form, then add all header stuff to header
   *)
-  let post_fun : operation_function =
-   fun path operation ->
+  let post_fun : Openapi_spec.components -> operation_function =
+   fun components path operation ->
     let name = operation_function_name operation path in
-    let data_conv, data_param =
-      data_conv_and_param ?name:operation.operationId operation.requestBody
-    in
     let params = Params.of_openapi_parameters operation.parameters in
-    let decode_resp, content = response_decoder operation in
+    let data_conv, data_param, form_params =
+      data_conv_and_param
+        ?name:operation.operationId
+        components
+        operation.requestBody
+    in
+    let params = { params with form = form_params } in
+    let decode_resp = response_decoder operation in
     let body =
       [%expr
         make_request
           ?data:[%e data_conv]
           ~path:[%e path_parts path]
           ~params:[%e query_params params.query]
-          ~headers:[%e extra_headers content params.header]
+          ~headers:[%e extra_headers params.header]
           ~decode:[%e decode_resp]
           `POST]
     in
     [%stri let [%p name] = [%e fun_with_params ~data:data_param params body]]
 
   let endpoint :
-      Openapi_spec.path * Openapi_spec.path_item -> structure_item list =
-   fun (path, path_item) ->
-    [ (get_fun path, path_item.get); (post_fun path, path_item.post) ]
+         Openapi_spec.components
+      -> Openapi_spec.path * Openapi_spec.path_item
+      -> structure_item list =
+   fun components (path, path_item) ->
+    [ (get_fun path, path_item.get)
+    ; (post_fun components path, path_item.post)
+    ]
     |> List.filter_map (fun (f, operation) -> Option.map f operation)
 
   (** Construct the AST node of the module with all endpoint functions *)
-  let of_paths : string * Openapi_spec.paths -> structure_item list =
-   fun (base_uri, endpoints) ->
+  let of_paths :
+         Openapi_spec.components
+      -> string * Openapi_spec.paths
+      -> structure_item list =
+   fun components (base_uri, endpoints) ->
     let endpoint_functor =
       let functor_param =
         Named
@@ -548,7 +692,7 @@ module EndpointsModule = struct
           ]
         in
         let endpoint_functions =
-          endpoints |> List.map endpoint |> List.flatten
+          endpoints |> List.map (endpoint components) |> List.flatten
         in
         Ast.pmod_structure (decls @ endpoint_functions)
       in
@@ -559,13 +703,6 @@ module EndpointsModule = struct
         |> Ast.pstr_module
       ]
 end
-
-let modules components server_endpoints =
-  DataModule.of_components components
-  :: EndpointsModule.of_paths server_endpoints
-
-(* TODO: Put in comment *)
-let header = "Generated by oooapi on DATE"
 
 let write_ast_f fmt str =
   Format.fprintf fmt "%a\n" Pprintast.structure str;
@@ -595,6 +732,9 @@ let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
         failwith "No servers specified"
     | Some (s :: _) -> s
   in
+  (* TODO safe handling of optional components *)
   [%stri let __NOTE__ = [%e Ast.estring (notice ())]]
   :: DataModule.of_components spec.components
-  :: EndpointsModule.of_paths (base_uri.url, Option.value ~default:[] spec.paths)
+  :: EndpointsModule.of_paths
+       (Option.get spec.components)
+       (base_uri.url, Option.value ~default:[] spec.paths)

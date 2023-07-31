@@ -44,10 +44,37 @@ let main =
                | None -> Lwt.return_unit
                | Some t -> Lwt_io.printl t)
     | Error (`Request (_, s)) ->
-        let* () = Lwt_io.printl "list_models: request failed" in
+        let* () = Lwt_io.printl "create_completion: request failed" in
         Lwt_io.printl s
     | Error (`Deseriaization (resp, err)) ->
-        let* () = Lwt_io.printl "list_models: deser failed" in
+        let* () = Lwt_io.printl "create_completion: deser failed" in
+        let* () = Lwt_io.printl err in
+        Lwt_io.printl resp
+  in
+  let* () =
+    let* res =
+      let data =
+        Data.CreateCompletionRequest.(
+          make
+            ~model:"text-davinci-003"
+            ~prompt:(Some (`String "You complete me"))
+            ())
+      in
+      Api.create_completion data
+    in
+    (* TODO: test multipart form data!! *)
+    match res with
+    | Ok data ->
+        data.choices
+        |> Lwt_list.iter_s (fun c ->
+               match c.Data.CreateCompletionResponse.choices_item_text with
+               | None -> Lwt.return_unit
+               | Some t -> Lwt_io.printl t)
+    | Error (`Request (_, s)) ->
+        let* () = Lwt_io.printl "create_completion: request failed" in
+        Lwt_io.printl s
+    | Error (`Deseriaization (resp, err)) ->
+        let* () = Lwt_io.printl "create_completion: deser failed" in
         let* () = Lwt_io.printl err in
         Lwt_io.printl resp
   in
