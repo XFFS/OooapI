@@ -3,7 +3,7 @@
   "info": {
     "title": "OpenAI API",
     "description": "APIs for sampling from and fine-tuning language models",
-    "version": "1.2.0"
+    "version": "2.0.0"
   },
   "servers": [
     {
@@ -16,135 +16,14 @@
       "description": "The OpenAI REST API"
     }
   ],
- "paths": {
-    "/engines": {
-      "get": {
-        "operationId": "listEngines",
-        "deprecated": true,
-        "tags": [
-          "OpenAI"
-        ],
-        "summary": "Lists the currently available (non-finetuned) models, and provides basic information about each one such as the owner and availability.",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListEnginesResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-oaiMeta": {
-          "name": "List engines",
-          "group": "engines",
-          "path": "list",
-          "examples": {
-            "curl": "curl https://api.openai.com/v1/engines \\\n  -H 'Authorization: Bearer YOUR_API_KEY'\n",
-            "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Engine.list()\n",
-            "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.listEngines();\n"
-          },
-          "response": "{\n  \"data\": [\n    {\n      \"id\": \"engine-id-0\",\n      \"object\": \"engine\",\n      \"owner\": \"organization-owner\",\n      \"ready\": true\n    },\n    {\n      \"id\": \"engine-id-2\",\n      \"object\": \"engine\",\n      \"owner\": \"organization-owner\",\n      \"ready\": true\n    },\n    {\n      \"id\": \"engine-id-3\",\n      \"object\": \"engine\",\n      \"owner\": \"openai\",\n      \"ready\": false\n    },\n  ],\n  \"object\": \"list\"\n}\n"
-        }
-      }
-    },
-    "/engines/{engine_id}": {
-      "get": {
-        "operationId": "retrieveEngine",
-        "deprecated": true,
-        "tags": [
-          "OpenAI"
-        ],
-        "summary": "Retrieves a model instance, providing basic information about it such as the owner and availability.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "engine_id",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "example": "davinci"
-            },
-            "description": "The ID of the engine to use for this request\n"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Engine"
-                }
-              }
-            }
-          }
-        },
-        "x-oaiMeta": {
-          "name": "Retrieve engine",
-          "group": "engines",
-          "path": "retrieve",
-          "examples": {
-            "curl": "curl https://api.openai.com/v1/engines/VAR_model_id \\\n  -H 'Authorization: Bearer YOUR_API_KEY'\n",
-            "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Engine.retrieve(\"VAR_model_id\")\n",
-            "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.retrieveEngine(\"VAR_model_id\");\n"
-          },
-          "response": "{\n  \"id\": \"VAR_model_id\",\n  \"object\": \"engine\",\n  \"owner\": \"openai\",\n  \"ready\": true\n}\n"
-        }
-      }
-    },
-    "/completions": {
-      "post": {
-        "operationId": "createCompletion",
-        "tags": [
-          "OpenAI"
-        ],
-        "summary": "Creates a completion for the provided prompt and parameters",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCompletionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateCompletionResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-oaiMeta": {
-          "name": "Create completion",
-          "group": "completions",
-          "path": "create",
-          "examples": {
-            "curl": "curl https://api.openai.com/v1/completions \\\n  -H 'Content-Type: application/json' \\\n  -H 'Authorization: Bearer YOUR_API_KEY' \\\n  -d '{\n  \"model\": \"VAR_model_id\",\n  \"prompt\": \"Say this is a test\",\n  \"max_tokens\": 7,\n  \"temperature\": 0\n}'\n",
-            "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Completion.create(\n  model=\"VAR_model_id\",\n  prompt=\"Say this is a test\",\n  max_tokens=7,\n  temperature=0\n)\n",
-            "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createCompletion({\n  model: \"VAR_model_id\",\n  prompt: \"Say this is a test\",\n  max_tokens: 7,\n  temperature: 0,\n});\n"
-          },
-          "parameters": "{\n  \"model\": \"VAR_model_id\",\n  \"prompt\": \"Say this is a test\",\n  \"max_tokens\": 7,\n  \"temperature\": 0,\n  \"top_p\": 1,\n  \"n\": 1,\n  \"stream\": false,\n  \"logprobs\": null,\n  \"stop\": \"\\n\"\n}\n",
-          "response": "{\n  \"id\": \"cmpl-uqkvlQyYK7bGYrRHQ0eXlWi7\",\n  \"object\": \"text_completion\",\n  \"created\": 1589478378,\n  \"model\": \"VAR_model_id\",\n  \"choices\": [\n    {\n      \"text\": \"\\n\\nThis is indeed a test\",\n      \"index\": 0,\n      \"logprobs\": null,\n      \"finish_reason\": \"length\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 5,\n    \"completion_tokens\": 7,\n    \"total_tokens\": 12\n  }\n}\n"
-        }
-      }
-    },
+  "paths": {
     "/chat/completions": {
       "post": {
         "operationId": "createChatCompletion",
         "tags": [
           "OpenAI"
         ],
-        "summary": "Creates a completion for the chat message",
+        "summary": "Creates a model response for the given chat conversation.",
         "requestBody": {
           "required": true,
           "content": {
@@ -171,20 +50,64 @@
           "name": "Create chat completion",
           "group": "chat",
           "path": "create",
-          "beta": true,
           "examples": {
-            "curl": "curl https://api.openai.com/v1/chat/completions \\\n  -H 'Content-Type: application/json' \\\n  -H 'Authorization: Bearer YOUR_API_KEY' \\\n  -d '{\n  \"model\": \"gpt-3.5-turbo\",\n  \"messages\": [{\"role\": \"user\", \"content\": \"Hello!\"}]\n}'\n",
-            "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\n\ncompletion = openai.ChatCompletion.create(\n  model=\"gpt-3.5-turbo\",\n  messages=[\n    {\"role\": \"user\", \"content\": \"Hello!\"}\n  ]\n)\n\nprint(completion.choices[0].message)\n",
-            "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\n\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\n\nconst completion = await openai.createChatCompletion({\n  model: \"gpt-3.5-turbo\",\n  messages: [{role: \"user\", content: \"Hello world\"}],\n});\nconsole.log(completion.data.choices[0].message);\n"
+            "curl": "curl https://api.openai.com/v1/chat/completions \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -d '{\n    \"model\": \"gpt-3.5-turbo\",\n    \"messages\": [{\"role\": \"system\", \"content\": \"You are a helpful assistant.\"}, {\"role\": \"user\", \"content\": \"Hello!\"}]\n  }'\n",
+            "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\n\ncompletion = openai.ChatCompletion.create(\n  model=\"gpt-3.5-turbo\",\n  messages=[\n    {\"role\": \"system\", \"content\": \"You are a helpful assistant.\"},\n    {\"role\": \"user\", \"content\": \"Hello!\"}\n  ]\n)\n\nprint(completion.choices[0].message)\n",
+            "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\n\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\n\nconst completion = await openai.createChatCompletion({\n  model: \"gpt-3.5-turbo\",\n  messages: [{\"role\": \"system\", \"content\": \"You are a helpful assistant.\"}, {role: \"user\", content: \"Hello world\"}],\n});\nconsole.log(completion.data.choices[0].message);\n"
           },
-          "parameters": "{\n  \"model\": \"gpt-3.5-turbo\",\n  \"messages\": [{\"role\": \"user\", \"content\": \"Hello!\"}]\n}\n",
+          "parameters": "{\n  \"model\": \"gpt-3.5-turbo\",\n  \"messages\": [{\"role\": \"system\", \"content\": \"You are a helpful assistant.\"}, {\"role\": \"user\", \"content\": \"Hello!\"}]\n}\n",
           "response": "{\n  \"id\": \"chatcmpl-123\",\n  \"object\": \"chat.completion\",\n  \"created\": 1677652288,\n  \"choices\": [{\n    \"index\": 0,\n    \"message\": {\n      \"role\": \"assistant\",\n      \"content\": \"\\n\\nHello there, how may I assist you today?\",\n    },\n    \"finish_reason\": \"stop\"\n  }],\n  \"usage\": {\n    \"prompt_tokens\": 9,\n    \"completion_tokens\": 12,\n    \"total_tokens\": 21\n  }\n}\n"
+        }
+      }
+    },
+    "/completions": {
+      "post": {
+        "operationId": "createCompletion",
+        "tags": [
+          "OpenAI"
+        ],
+        "summary": "Creates a completion for the provided prompt and parameters.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCompletionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateCompletionResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-oaiMeta": {
+          "name": "Create completion",
+          "group": "completions",
+          "path": "create",
+          "legacy": true,
+          "examples": {
+            "curl": "curl https://api.openai.com/v1/completions \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -d '{\n    \"model\": \"VAR_model_id\",\n    \"prompt\": \"Say this is a test\",\n    \"max_tokens\": 7,\n    \"temperature\": 0\n  }'\n",
+            "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Completion.create(\n  model=\"VAR_model_id\",\n  prompt=\"Say this is a test\",\n  max_tokens=7,\n  temperature=0\n)\n",
+            "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createCompletion({\n  model: \"VAR_model_id\",\n  prompt: \"Say this is a test\",\n  max_tokens: 7,\n  temperature: 0,\n});\n"
+          },
+          "parameters": "{\n  \"model\": \"VAR_model_id\",\n  \"prompt\": \"Say this is a test\",\n  \"max_tokens\": 7,\n  \"temperature\": 0,\n  \"top_p\": 1,\n  \"n\": 1,\n  \"stream\": false,\n  \"logprobs\": null,\n  \"stop\": \"\\n\"\n}\n",
+          "response": "{\n  \"id\": \"cmpl-uqkvlQyYK7bGYrRHQ0eXlWi7\",\n  \"object\": \"text_completion\",\n  \"created\": 1589478378,\n  \"model\": \"VAR_model_id\",\n  \"choices\": [\n    {\n      \"text\": \"\\n\\nThis is indeed a test\",\n      \"index\": 0,\n      \"logprobs\": null,\n      \"finish_reason\": \"length\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 5,\n    \"completion_tokens\": 7,\n    \"total_tokens\": 12\n  }\n}\n"
         }
       }
     },
     "/edits": {
       "post": {
         "operationId": "createEdit",
+        "deprecated": true,
         "tags": [
           "OpenAI"
         ],
@@ -216,11 +139,11 @@
           "group": "edits",
           "path": "create",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/edits \\\n  -H 'Content-Type: application/json' \\\n  -H 'Authorization: Bearer YOUR_API_KEY' \\\n  -d '{\n  \"model\": \"VAR_model_id\",\n  \"input\": \"What day of the wek is it?\",\n  \"instruction\": \"Fix the spelling mistakes\"\n}'\n",
+            "curl": "curl https://api.openai.com/v1/edits \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -d '{\n    \"model\": \"VAR_model_id\",\n    \"input\": \"What day of the wek is it?\",\n    \"instruction\": \"Fix the spelling mistakes\"\n  }'\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Edit.create(\n  model=\"VAR_model_id\",\n  input=\"What day of the wek is it?\",\n  instruction=\"Fix the spelling mistakes\"\n)\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createEdit({\n  model: \"VAR_model_id\",\n  input: \"What day of the wek is it?\",\n  instruction: \"Fix the spelling mistakes\",\n});\n"
           },
-          "parameters": "{\n  \"model\": \"VAR_model_id\",\n  \"input\": \"What day of the wek is it?\",\n  \"instruction\": \"Fix the spelling mistakes\",\n}\n",
+          "parameters": "{\n  \"model\": \"VAR_model_id\",\n  \"input\": \"What day of the wek is it?\",\n  \"instruction\": \"Fix the spelling mistakes\"\n}\n",
           "response": "{\n  \"object\": \"edit\",\n  \"created\": 1589478378,\n  \"choices\": [\n    {\n      \"text\": \"What day of the week is it?\",\n      \"index\": 0,\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 25,\n    \"completion_tokens\": 32,\n    \"total_tokens\": 57\n  }\n}\n"
         }
       }
@@ -258,9 +181,8 @@
           "name": "Create image",
           "group": "images",
           "path": "create",
-          "beta": true,
           "examples": {
-            "curl": "curl https://api.openai.com/v1/images/generations \\\n  -H 'Content-Type: application/json' \\\n  -H 'Authorization: Bearer YOUR_API_KEY' \\\n  -d '{\n  \"prompt\": \"A cute baby sea otter\",\n  \"n\": 2,\n  \"size\": \"1024x1024\"\n}'\n",
+            "curl": "curl https://api.openai.com/v1/images/generations \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -d '{\n    \"prompt\": \"A cute baby sea otter\",\n    \"n\": 2,\n    \"size\": \"1024x1024\"\n  }'\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Image.create(\n  prompt=\"A cute baby sea otter\",\n  n=2,\n  size=\"1024x1024\"\n)\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createImage({\n  prompt: \"A cute baby sea otter\",\n  n: 2,\n  size: \"1024x1024\",\n});\n"
           },
@@ -302,11 +224,10 @@
           "name": "Create image edit",
           "group": "images",
           "path": "create-edit",
-          "beta": true,
           "examples": {
-            "curl": "curl https://api.openai.com/v1/images/edits \\\n  -H 'Authorization: Bearer YOUR_API_KEY' \\\n  -F image='@otter.png' \\\n  -F mask='@mask.png' \\\n  -F prompt=\"A cute baby sea otter wearing a beret\" \\\n  -F n=2 \\\n  -F size=\"1024x1024\"\n",
+            "curl": "curl https://api.openai.com/v1/images/edits \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -F image=\"@otter.png\" \\\n  -F mask=\"@mask.png\" \\\n  -F prompt=\"A cute baby sea otter wearing a beret\" \\\n  -F n=2 \\\n  -F size=\"1024x1024\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Image.create_edit(\n  image=open(\"otter.png\", \"rb\"),\n  mask=open(\"mask.png\", \"rb\"),\n  prompt=\"A cute baby sea otter wearing a beret\",\n  n=2,\n  size=\"1024x1024\"\n)\n",
-            "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createImageEdit(\n  fs.createReadStream(\"otter.png\"),\n  fs.createReadStream(\"mask.png\"),\n  \"A cute baby sea otter wearing a beret\",\n  2,\n  \"1024x1024\"\n);\n"
+            "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createImageEdit(\n  fs.createReadStream(\"otter.png\"),\n  \"A cute baby sea otter wearing a beret\",\n  fs.createReadStream(\"mask.png\"),\n  2,\n  \"1024x1024\"\n);\n"
           },
           "response": "{\n  \"created\": 1589478378,\n  \"data\": [\n    {\n      \"url\": \"https://...\"\n    },\n    {\n      \"url\": \"https://...\"\n    }\n  ]\n}\n"
         }
@@ -345,9 +266,8 @@
           "name": "Create image variation",
           "group": "images",
           "path": "create-variation",
-          "beta": true,
           "examples": {
-            "curl": "curl https://api.openai.com/v1/images/variations \\\n  -H 'Authorization: Bearer YOUR_API_KEY' \\\n  -F image='@otter.png' \\\n  -F n=2 \\\n  -F size=\"1024x1024\"\n",
+            "curl": "curl https://api.openai.com/v1/images/variations \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -F image=\"@otter.png\" \\\n  -F n=2 \\\n  -F size=\"1024x1024\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Image.create_variation(\n  image=open(\"otter.png\", \"rb\"),\n  n=2,\n  size=\"1024x1024\"\n)\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createImageVariation(\n  fs.createReadStream(\"otter.png\"),\n  2,\n  \"1024x1024\"\n);\n"
           },
@@ -389,7 +309,7 @@
           "group": "embeddings",
           "path": "create",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/embeddings \\\n  -X POST \\\n  -H \"Authorization: Bearer YOUR_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"input\": \"The food was delicious and the waiter...\",\n       \"model\": \"text-embedding-ada-002\"}'\n",
+            "curl": "curl https://api.openai.com/v1/embeddings \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"input\": \"The food was delicious and the waiter...\",\n    \"model\": \"text-embedding-ada-002\"\n  }'\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Embedding.create(\n  model=\"text-embedding-ada-002\",\n  input=\"The food was delicious and the waiter...\"\n)\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createEmbedding({\n  model: \"text-embedding-ada-002\",\n  input: \"The food was delicious and the waiter...\",\n});\n"
           },
@@ -431,9 +351,8 @@
           "name": "Create transcription",
           "group": "audio",
           "path": "create",
-          "beta": true,
           "examples": {
-            "curl": "curl https://api.openai.com/v1/audio/transcriptions \\\n  -X POST \\\n  -H 'Authorization: Bearer TOKEN' \\\n  -H 'Content-Type: multipart/form-data' \\\n  -F file=@/path/to/file/audio.mp3 \\\n  -F model=whisper-1\n",
+            "curl": "curl https://api.openai.com/v1/audio/transcriptions \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -H \"Content-Type: multipart/form-data\" \\\n  -F file=\"@/path/to/file/audio.mp3\" \\\n  -F model=\"whisper-1\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\naudio_file = open(\"audio.mp3\", \"rb\")\ntranscript = openai.Audio.transcribe(\"whisper-1\", audio_file)\n",
             "node": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst resp = await openai.createTranscription(\n  fs.createReadStream(\"audio.mp3\"),\n  \"whisper-1\"\n);\n"
           },
@@ -448,7 +367,7 @@
         "tags": [
           "OpenAI"
         ],
-        "summary": "Translates audio into into English.",
+        "summary": "Translates audio into English.",
         "requestBody": {
           "required": true,
           "content": {
@@ -475,70 +394,13 @@
           "name": "Create translation",
           "group": "audio",
           "path": "create",
-          "beta": true,
           "examples": {
-            "curl": "curl https://api.openai.com/v1/audio/translations \\\n    -X POST \\\n    -H 'Authorization: Bearer TOKEN' \\\n    -H 'Content-Type: multipart/form-data' \\\n    -F file=@/path/to/file/german.m4a \\\n    -F model=whisper-1\n",
+            "curl": "curl https://api.openai.com/v1/audio/translations \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -H \"Content-Type: multipart/form-data\" \\\n  -F file=\"@/path/to/file/german.m4a\" \\\n  -F model=\"whisper-1\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\naudio_file = open(\"german.m4a\", \"rb\")\ntranscript = openai.Audio.translate(\"whisper-1\", audio_file)\n",
             "node": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst resp = await openai.createTranslation(\n  fs.createReadStream(\"audio.mp3\"),\n  \"whisper-1\"\n);\n"
           },
           "parameters": "{\n  \"file\": \"german.m4a\",\n  \"model\": \"whisper-1\"\n}\n",
           "response": "{\n  \"text\": \"Hello, my name is Wolfgang and I come from Germany. Where are you heading today?\"\n}\n"
-        }
-      }
-    },
-    "/engines/{engine_id}/search": {
-      "post": {
-        "operationId": "createSearch",
-        "deprecated": true,
-        "tags": [
-          "OpenAI"
-        ],
-        "summary": "The search endpoint computes similarity scores between provided query and documents. Documents can be passed directly to the API if there are no more than 200 of them.\n\nTo go beyond the 200 document limit, documents can be processed offline and then used for efficient retrieval at query time. When `file` is set, the search endpoint searches over all the documents in the given file and returns up to the `max_rerank` number of documents. These documents will be returned along with their search scores.\n\nThe similarity score is a positive score that usually ranges from 0 to 300 (but can sometimes go higher), where a score above 200 usually means the document is semantically similar to the query.\n",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "engine_id",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "example": "davinci"
-            },
-            "description": "The ID of the engine to use for this request.  You can select one of `ada`, `babbage`, `curie`, or `davinci`."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateSearchRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateSearchResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-oaiMeta": {
-          "name": "Create search",
-          "group": "searches",
-          "path": "create",
-          "examples": {
-            "curl": "curl https://api.openai.com/v1/engines/davinci/search \\\n  -H \"Content-Type: application/json\" \\\n  -H 'Authorization: Bearer YOUR_API_KEY' \\\n  -d '{\n  \"documents\": [\"White House\", \"hospital\", \"school\"],\n  \"query\": \"the president\"\n}'\n",
-            "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Engine(\"davinci\").search(\n  documents=[\"White House\", \"hospital\", \"school\"],\n  query=\"the president\"\n)\n",
-            "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createSearch(\"davinci\", {\n  documents: [\"White House\", \"hospital\", \"school\"],\n  query: \"the president\",\n});\n"
-          },
-          "parameters": "{\n  \"documents\": [\n    \"White House\",\n    \"hospital\",\n    \"school\"\n  ],\n  \"query\": \"the president\"\n}\n",
-          "response": "{\n  \"data\": [\n    {\n      \"document\": 0,\n      \"object\": \"search_result\",\n      \"score\": 215.412\n    },\n    {\n      \"document\": 1,\n      \"object\": \"search_result\",\n      \"score\": 40.316\n    },\n    {\n      \"document\": 2,\n      \"object\": \"search_result\",\n      \"score\":  55.226\n    }\n  ],\n  \"object\": \"list\"\n}\n"
         }
       }
     },
@@ -566,7 +428,7 @@
           "group": "files",
           "path": "list",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/files \\\n  -H 'Authorization: Bearer YOUR_API_KEY'\n",
+            "curl": "curl https://api.openai.com/v1/files \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.File.list()\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.listFiles();\n"
           },
@@ -606,7 +468,7 @@
           "group": "files",
           "path": "upload",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/files \\\n  -H \"Authorization: Bearer YOUR_API_KEY\" \\\n  -F purpose=\"fine-tune\" \\\n  -F file='@mydata.jsonl'\n",
+            "curl": "curl https://api.openai.com/v1/files \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -F purpose=\"fine-tune\" \\\n  -F file=\"@mydata.jsonl\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.File.create(\n  file=open(\"mydata.jsonl\", \"rb\"),\n  purpose='fine-tune'\n)\n",
             "node.js": "const fs = require(\"fs\");\nconst { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createFile(\n  fs.createReadStream(\"mydata.jsonl\"),\n  \"fine-tune\"\n);\n"
           },
@@ -649,7 +511,7 @@
           "group": "files",
           "path": "delete",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3 \\\n  -X DELETE \\\n  -H 'Authorization: Bearer YOUR_API_KEY'\n",
+            "curl": "curl https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3 \\\n  -X DELETE \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.File.delete(\"file-XjGxS3KTG0uNmNOK362iJua3\")\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.deleteFile(\"file-XjGxS3KTG0uNmNOK362iJua3\");\n"
           },
@@ -690,7 +552,7 @@
           "group": "files",
           "path": "retrieve",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3 \\\n  -H 'Authorization: Bearer YOUR_API_KEY'\n",
+            "curl": "curl https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3 \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.File.retrieve(\"file-XjGxS3KTG0uNmNOK362iJua3\")\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.retrieveFile(\"file-XjGxS3KTG0uNmNOK362iJua3\");\n"
           },
@@ -733,98 +595,10 @@
           "group": "files",
           "path": "retrieve-content",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3/content \\\n  -H 'Authorization: Bearer YOUR_API_KEY' > file.jsonl\n",
+            "curl": "curl https://api.openai.com/v1/files/file-XjGxS3KTG0uNmNOK362iJua3/content \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" > file.jsonl\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\ncontent = openai.File.download(\"file-XjGxS3KTG0uNmNOK362iJua3\")\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.downloadFile(\"file-XjGxS3KTG0uNmNOK362iJua3\");\n"
           }
-        }
-      }
-    },
-    "/answers": {
-      "post": {
-        "operationId": "createAnswer",
-        "deprecated": true,
-        "tags": [
-          "OpenAI"
-        ],
-        "summary": "Answers the specified question using the provided documents and examples.\n\nThe endpoint first [searches](/docs/api-reference/searches) over provided documents or files to find relevant context. The relevant context is combined with the provided examples and question to create the prompt for [completion](/docs/api-reference/completions).\n",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateAnswerRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateAnswerResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-oaiMeta": {
-          "name": "Create answer",
-          "group": "answers",
-          "path": "create",
-          "examples": {
-            "curl": "curl https://api.openai.com/v1/answers \\\n  -X POST \\\n  -H \"Authorization: Bearer YOUR_API_KEY\" \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n    \"documents\": [\"Puppy A is happy.\", \"Puppy B is sad.\"],\n    \"question\": \"which puppy is happy?\",\n    \"search_model\": \"ada\",\n    \"model\": \"curie\",\n    \"examples_context\": \"In 2017, U.S. life expectancy was 78.6 years.\",\n    \"examples\": [[\"What is human life expectancy in the United States?\",\"78 years.\"]],\n    \"max_tokens\": 5,\n    \"stop\": [\"\\n\", \"<|endoftext|>\"]\n  }'\n",
-            "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Answer.create(\n  search_model=\"ada\",\n  model=\"curie\",\n  question=\"which puppy is happy?\",\n  documents=[\"Puppy A is happy.\", \"Puppy B is sad.\"],\n  examples_context=\"In 2017, U.S. life expectancy was 78.6 years.\",\n  examples=[[\"What is human life expectancy in the United States?\",\"78 years.\"]],\n  max_tokens=5,\n  stop=[\"\\n\", \"<|endoftext|>\"],\n)\n",
-            "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createAnswer({\n  search_model: \"ada\",\n  model: \"curie\",\n  question: \"which puppy is happy?\",\n  documents: [\"Puppy A is happy.\", \"Puppy B is sad.\"],\n  examples_context: \"In 2017, U.S. life expectancy was 78.6 years.\",\n  examples: [[\"What is human life expectancy in the United States?\",\"78 years.\"]],\n  max_tokens: 5,\n  stop: [\"\\n\", \"<|endoftext|>\"],\n});\n"
-          },
-          "parameters": "{\n  \"documents\": [\"Puppy A is happy.\", \"Puppy B is sad.\"],\n  \"question\": \"which puppy is happy?\",\n  \"search_model\": \"ada\",\n  \"model\": \"curie\",\n  \"examples_context\": \"In 2017, U.S. life expectancy was 78.6 years.\",\n  \"examples\": [[\"What is human life expectancy in the United States?\",\"78 years.\"]],\n  \"max_tokens\": 5,\n  \"stop\": [\"\\n\", \"<|endoftext|>\"]\n}\n",
-          "response": "{\n  \"answers\": [\n    \"puppy A.\"\n  ],\n  \"completion\": \"cmpl-2euVa1kmKUuLpSX600M41125Mo9NI\",\n  \"model\": \"curie:2020-05-03\",\n  \"object\": \"answer\",\n  \"search_model\": \"ada\",\n  \"selected_documents\": [\n    {\n      \"document\": 0,\n      \"text\": \"Puppy A is happy. \"\n    },\n    {\n      \"document\": 1,\n      \"text\": \"Puppy B is sad. \"\n    }\n  ]\n}\n"
-        }
-      }
-    },
-    "/classifications": {
-      "post": {
-        "operationId": "createClassification",
-        "deprecated": true,
-        "tags": [
-          "OpenAI"
-        ],
-        "summary": "Classifies the specified `query` using provided examples.\n\nThe endpoint first [searches](/docs/api-reference/searches) over the labeled examples\nto select the ones most relevant for the particular query. Then, the relevant examples\nare combined with the query to construct a prompt to produce the final label via the\n[completions](/docs/api-reference/completions) endpoint.\n\nLabeled examples can be provided via an uploaded `file`, or explicitly listed in the\nrequest using the `examples` parameter for quick tests and small scale use cases.\n",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateClassificationRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CreateClassificationResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-oaiMeta": {
-          "name": "Create classification",
-          "group": "classifications",
-          "path": "create",
-          "examples": {
-            "curl": "curl https://api.openai.com/v1/classifications \\\n  -X POST \\\n  -H \"Authorization: Bearer YOUR_API_KEY\" \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n    \"examples\": [\n      [\"A happy moment\", \"Positive\"],\n      [\"I am sad.\", \"Negative\"],\n      [\"I am feeling awesome\", \"Positive\"]],\n    \"query\": \"It is a raining day :(\",\n    \"search_model\": \"ada\",\n    \"model\": \"curie\",\n    \"labels\":[\"Positive\", \"Negative\", \"Neutral\"]\n  }'\n",
-            "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Classification.create(\n  search_model=\"ada\",\n  model=\"curie\",\n  examples=[\n    [\"A happy moment\", \"Positive\"],\n    [\"I am sad.\", \"Negative\"],\n    [\"I am feeling awesome\", \"Positive\"]\n  ],\n  query=\"It is a raining day :(\",\n  labels=[\"Positive\", \"Negative\", \"Neutral\"],\n)\n",
-            "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createClassification({\n  search_model: \"ada\",\n  model: \"curie\",\n  examples: [\n    [\"A happy moment\", \"Positive\"],\n    [\"I am sad.\", \"Negative\"],\n    [\"I am feeling awesome\", \"Positive\"]\n  ],\n  query:\"It is a raining day :(\",\n  labels: [\"Positive\", \"Negative\", \"Neutral\"],\n});\n"
-          },
-          "parameters": "{\n  \"examples\": [\n    [\"A happy moment\", \"Positive\"],\n    [\"I am sad.\", \"Negative\"],\n    [\"I am feeling awesome\", \"Positive\"]\n  ],\n  \"labels\": [\"Positive\", \"Negative\", \"Neutral\"],\n  \"query\": \"It is a raining day :(\",\n  \"search_model\": \"ada\",\n  \"model\": \"curie\"\n}\n",
-          "response": "{\n  \"completion\": \"cmpl-2euN7lUVZ0d4RKbQqRV79IiiE6M1f\",\n  \"label\": \"Negative\",\n  \"model\": \"curie:2020-05-03\",\n  \"object\": \"classification\",\n  \"search_model\": \"ada\",\n  \"selected_examples\": [\n    {\n      \"document\": 1,\n      \"label\": \"Negative\",\n      \"text\": \"I am sad.\"\n    },\n    {\n      \"document\": 0,\n      \"label\": \"Positive\",\n      \"text\": \"A happy moment\"\n    },\n    {\n      \"document\": 2,\n      \"label\": \"Positive\",\n      \"text\": \"I am feeling awesome\"\n    }\n  ]\n}\n"
         }
       }
     },
@@ -862,7 +636,7 @@
           "group": "fine-tunes",
           "path": "create",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/fine-tunes \\\n  -X POST \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer YOUR_API_KEY\" \\\n  -d '{\n  \"training_file\": \"file-XGinujblHPwGLSztz8cPS8XY\"\n}'\n",
+            "curl": "curl https://api.openai.com/v1/fine-tunes \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -d '{\n    \"training_file\": \"file-XGinujblHPwGLSztz8cPS8XY\"\n  }'\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.FineTune.create(training_file=\"file-XGinujblHPwGLSztz8cPS8XY\")\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createFineTune({\n  training_file: \"file-XGinujblHPwGLSztz8cPS8XY\",\n});\n"
           },
@@ -892,7 +666,7 @@
           "group": "fine-tunes",
           "path": "list",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/fine-tunes \\\n  -H 'Authorization: Bearer YOUR_API_KEY'\n",
+            "curl": "curl https://api.openai.com/v1/fine-tunes \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.FineTune.list()\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.listFineTunes();\n"
           },
@@ -936,7 +710,7 @@
           "group": "fine-tunes",
           "path": "retrieve",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/fine-tunes/ft-AF1WoRqd3aJAHsqc9NY7iL8F \\\n  -H \"Authorization: Bearer YOUR_API_KEY\"\n",
+            "curl": "curl https://api.openai.com/v1/fine-tunes/ft-AF1WoRqd3aJAHsqc9NY7iL8F \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.FineTune.retrieve(id=\"ft-AF1WoRqd3aJAHsqc9NY7iL8F\")\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.retrieveFineTune(\"ft-AF1WoRqd3aJAHsqc9NY7iL8F\");\n"
           },
@@ -980,7 +754,7 @@
           "group": "fine-tunes",
           "path": "cancel",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/fine-tunes/ft-AF1WoRqd3aJAHsqc9NY7iL8F/cancel \\\n  -X POST \\\n  -H \"Authorization: Bearer YOUR_API_KEY\"\n",
+            "curl": "curl https://api.openai.com/v1/fine-tunes/ft-AF1WoRqd3aJAHsqc9NY7iL8F/cancel \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.FineTune.cancel(id=\"ft-AF1WoRqd3aJAHsqc9NY7iL8F\")\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.cancelFineTune(\"ft-AF1WoRqd3aJAHsqc9NY7iL8F\");\n"
           },
@@ -1034,7 +808,7 @@
           "group": "fine-tunes",
           "path": "events",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/fine-tunes/ft-AF1WoRqd3aJAHsqc9NY7iL8F/events \\\n  -H \"Authorization: Bearer YOUR_API_KEY\"\n",
+            "curl": "curl https://api.openai.com/v1/fine-tunes/ft-AF1WoRqd3aJAHsqc9NY7iL8F/events \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.FineTune.list_events(id=\"ft-AF1WoRqd3aJAHsqc9NY7iL8F\")\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.listFineTuneEvents(\"ft-AF1WoRqd3aJAHsqc9NY7iL8F\");\n"
           },
@@ -1066,7 +840,7 @@
           "group": "models",
           "path": "list",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/models \\\n  -H 'Authorization: Bearer YOUR_API_KEY'\n",
+            "curl": "curl https://api.openai.com/v1/models \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Model.list()\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.listModels();\n"
           },
@@ -1110,7 +884,7 @@
           "group": "models",
           "path": "retrieve",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/models/VAR_model_id \\\n  -H 'Authorization: Bearer YOUR_API_KEY'\n",
+            "curl": "curl https://api.openai.com/v1/models/VAR_model_id \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Model.retrieve(\"VAR_model_id\")\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.retrieveModel(\"VAR_model_id\");\n"
           },
@@ -1152,7 +926,7 @@
           "group": "fine-tunes",
           "path": "delete-model",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/models/curie:ft-acmeco-2021-03-03-21-44-20 \\\n  -X DELETE \\\n  -H \"Authorization: Bearer YOUR_API_KEY\"\n",
+            "curl": "curl https://api.openai.com/v1/models/curie:ft-acmeco-2021-03-03-21-44-20 \\\n  -X DELETE \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\"\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Model.delete(\"curie:ft-acmeco-2021-03-03-21-44-20\")\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.deleteModel('curie:ft-acmeco-2021-03-03-21-44-20');\n"
           },
@@ -1194,34 +968,54 @@
           "group": "moderations",
           "path": "create",
           "examples": {
-            "curl": "curl https://api.openai.com/v1/moderations \\\n  -H 'Content-Type: application/json' \\\n  -H 'Authorization: Bearer YOUR_API_KEY' \\\n  -d '{\n  \"input\": \"I want to kill them.\"\n}'\n",
+            "curl": "curl https://api.openai.com/v1/moderations \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n  -d '{\n    \"input\": \"I want to kill them.\"\n  }'\n",
             "python": "import os\nimport openai\nopenai.api_key = os.getenv(\"OPENAI_API_KEY\")\nopenai.Moderation.create(\n  input=\"I want to kill them.\",\n)\n",
             "node.js": "const { Configuration, OpenAIApi } = require(\"openai\");\nconst configuration = new Configuration({\n  apiKey: process.env.OPENAI_API_KEY,\n});\nconst openai = new OpenAIApi(configuration);\nconst response = await openai.createModeration({\n  input: \"I want to kill them.\",\n});\n"
           },
           "parameters": "{\n  \"input\": \"I want to kill them.\"\n}\n",
-          "response": "{\n  \"id\": \"modr-5MWoLO\",\n  \"model\": \"text-moderation-001\",\n  \"results\": [\n    {\n      \"categories\": {\n        \"hate\": false,\n        \"hate/threatening\": true,\n        \"self-harm\": false,\n        \"sexual\": false,\n        \"sexual/minors\": false,\n        \"violence\": true,\n        \"violence/graphic\": false\n      },\n      \"category_scores\": {\n        \"hate\": 0.22714105248451233,\n        \"hate/threatening\": 0.4132447838783264,\n        \"self-harm\": 0.005232391878962517,\n        \"sexual\": 0.01407341007143259,\n        \"sexual/minors\": 0.0038522258400917053,\n        \"violence\": 0.9223177433013916,\n        \"violence/graphic\": 0.036865197122097015\n      },\n      \"flagged\": true\n    }\n  ]\n}\n"
+          "response": "{\n  \"id\": \"modr-XXXXX\",\n  \"model\": \"text-moderation-005\",\n  \"results\": [\n    {\n      \"flagged\": true,\n      \"categories\": {\n        \"sexual\": false,\n        \"hate\": false,\n        \"harassment\": false,\n        \"self-harm\": false,\n        \"sexual/minors\": false,\n        \"hate/threatening\": false,\n        \"violence/graphic\": false,\n        \"self-harm/intent\": false,\n        \"self-harm/instructions\": false,\n        \"harassment/threatening\": true,\n        \"violence\": true,\n      },\n      \"category_scores\": {\n        \"sexual\": 1.2282071e-06,\n        \"hate\": 0.010696256,\n        \"harassment\": 0.29842457,\n        \"self-harm\": 1.5236925e-08,\n        \"sexual/minors\": 5.7246268e-08,\n        \"hate/threatening\": 0.0060676364,\n        \"violence/graphic\": 4.435014e-06,\n        \"self-harm/intent\": 8.098441e-10,\n        \"self-harm/instructions\": 2.8498655e-11,\n        \"harassment/threatening\": 0.63055265,\n        \"violence\": 0.99011886,\n      }\n    }\n  ]\n}\n"
         }
       }
     }
   },
   "components": {
     "schemas": {
-      "ListEnginesResponse": {
+      "Error": {
         "type": "object",
         "properties": {
-          "object": {
-            "type": "string"
+          "type": {
+            "type": "string",
+            "nullable": false
           },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Engine"
-            }
+          "message": {
+            "type": "string",
+            "nullable": false
+          },
+          "param": {
+            "type": "string",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
-          "object",
-          "data"
+          "type",
+          "message",
+          "param",
+          "code"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/Error"
+          }
+        },
+        "required": [
+          "error"
         ]
       },
       "ListModelsResponse": {
@@ -1265,8 +1059,25 @@
         "type": "object",
         "properties": {
           "model": {
-            "description": "ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them.",
-            "type": "string"
+            "description": "ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them.\n",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "text-davinci-003",
+                  "text-davinci-002",
+                  "text-davinci-001",
+                  "code-davinci-002",
+                  "text-curie-001",
+                  "text-babbage-001",
+                  "text-ada-001"
+                ]
+              }
+            ],
+            "x-oaiTypeLabel": "string"
           },
           "prompt": {
             "description": "The prompt(s) to generate completions for, encoded as a string, array of strings, array of tokens, or array of token arrays.\n\nNote that <|endoftext|> is the document separator that the model sees during training, so if a prompt is not specified the model will generate as if from the beginning of a new document.\n",
@@ -1321,7 +1132,7 @@
             "default": 16,
             "example": 16,
             "nullable": true,
-            "description": "The maximum number of [tokens](/tokenizer) to generate in the completion.\n\nThe token count of your prompt plus `max_tokens` cannot exceed the model's context length. Most models have a context length of 2048 tokens (except for the newest models, which support 4096).\n"
+            "description": "The maximum number of [tokens](/tokenizer) to generate in the completion.\n\nThe token count of your prompt plus `max_tokens` cannot exceed the model's context length. [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb) for counting tokens.\n"
           },
           "temperature": {
             "type": "number",
@@ -1351,7 +1162,7 @@
             "description": "How many completions to generate for each prompt.\n\n**Note:** Because this parameter generates many completions, it can quickly consume your token quota. Use carefully and ensure that you have reasonable settings for `max_tokens` and `stop`.\n"
           },
           "stream": {
-            "description": "Whether to stream back partial progress. If set, tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message.\n",
+            "description": "Whether to stream back partial progress. If set, tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message. [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).\n",
             "type": "boolean",
             "nullable": true,
             "default": false
@@ -1362,7 +1173,7 @@
             "maximum": 5,
             "default": null,
             "nullable": true,
-            "description": "Include the log probabilities on the `logprobs` most likely tokens, as well the chosen tokens. For example, if `logprobs` is 5, the API will return a list of the 5 most likely tokens. The API will always return the `logprob` of the sampled token, so there may be up to `logprobs+1` elements in the response.\n\nThe maximum value for `logprobs` is 5. If you need more than this, please contact us through our [Help center](https://help.openai.com) and describe your use case.\n"
+            "description": "Include the log probabilities on the `logprobs` most likely tokens, as well the chosen tokens. For example, if `logprobs` is 5, the API will return a list of the 5 most likely tokens. The API will always return the `logprob` of the sampled token, so there may be up to `logprobs+1` elements in the response.\n\nThe maximum value for `logprobs` is 5.\n"
           },
           "echo": {
             "type": "boolean",
@@ -1421,6 +1232,9 @@
             "x-oaiTypeLabel": "map",
             "default": null,
             "nullable": true,
+            "additionalProperties": {
+              "type": "integer"
+            },
             "description": "Modify the likelihood of specified tokens appearing in the completion.\n\nAccepts a json object that maps tokens (specified by their token ID in the GPT tokenizer) to an associated bias value from -100 to 100. You can use this [tokenizer tool](/tokenizer?view=bpe) (which works for both GPT-2 and GPT-3) to convert text to token IDs. Mathematically, the bias is added to the logits generated by the model prior to sampling. The exact effect will vary per model, but values between -1 and 1 should decrease or increase likelihood of selection; values like -100 or 100 should result in a ban or exclusive selection of the relevant token.\n\nAs an example, you can pass `{\"50256\": -100}` to prevent the <|endoftext|> token from being generated.\n"
           },
           "user": {
@@ -1430,7 +1244,8 @@
           }
         },
         "required": [
-          "model"
+          "model",
+          "prompt"
         ]
       },
       "CreateCompletionResponse": {
@@ -1452,6 +1267,12 @@
             "type": "array",
             "items": {
               "type": "object",
+              "required": [
+                "text",
+                "index",
+                "logprobs",
+                "finish_reason"
+              ],
               "properties": {
                 "text": {
                   "type": "string"
@@ -1478,7 +1299,10 @@
                     "top_logprobs": {
                       "type": "array",
                       "items": {
-                        "type": "object"
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "integer"
+                        }
                       }
                     },
                     "text_offset": {
@@ -1490,7 +1314,11 @@
                   }
                 },
                 "finish_reason": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "stop",
+                    "length"
+                  ]
                 }
               }
             }
@@ -1531,22 +1359,67 @@
             "enum": [
               "system",
               "user",
-              "assistant"
+              "assistant",
+              "function"
             ],
-            "description": "The role of the author of this message."
+            "description": "The role of the messages author. One of `system`, `user`, `assistant`, or `function`."
           },
           "content": {
             "type": "string",
-            "description": "The contents of the message"
+            "nullable": true,
+            "description": "The contents of the message. `content` is required for all messages, and may be null for assistant messages with function calls."
           },
           "name": {
             "type": "string",
-            "description": "The name of the user in a multi-user chat"
+            "description": "The name of the author of this message. `name` is required if role is `function`, and it should be the name of the function whose response is in the `content`. May contain a-z, A-Z, 0-9, and underscores, with a maximum length of 64 characters."
+          },
+          "function_call": {
+            "type": "object",
+            "description": "The name and arguments of a function that should be called, as generated by the model.",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The name of the function to call."
+              },
+              "arguments": {
+                "type": "string",
+                "description": "The arguments to call the function with, as generated by the model in JSON format. Note that the model does not always generate valid JSON, and may hallucinate parameters not defined by your function schema. Validate the arguments in your code before calling your function."
+              }
+            },
+            "required": [
+              "name",
+              "arguments"
+            ]
           }
         },
         "required": [
           "role",
           "content"
+        ]
+      },
+      "ChatCompletionFunctionParameters": {
+        "type": "object",
+        "description": "The parameters the functions accepts, described as a JSON Schema object. See the [guide](/docs/guides/gpt/function-calling) for examples, and the [JSON Schema reference](https://json-schema.org/understanding-json-schema/) for documentation about the format.\n\nTo describe a function that accepts no parameters, provide the value `{\"type\": \"object\", \"properties\": {}}`.",
+        "additionalProperties": true
+      },
+      "ChatCompletionFunctions": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the function to be called. Must be a-z, A-Z, 0-9, or contain underscores and dashes, with a maximum length of 64."
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of what the function does, used by the model to choose when and how to call the function."
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/ChatCompletionFunctionParameters"
+          }
+        },
+        "required": [
+          "name",
+          "parameters"
         ]
       },
       "ChatCompletionResponseMessage": {
@@ -1557,34 +1430,137 @@
             "enum": [
               "system",
               "user",
-              "assistant"
+              "assistant",
+              "function"
             ],
             "description": "The role of the author of this message."
           },
           "content": {
             "type": "string",
-            "description": "The contents of the message"
+            "description": "The contents of the message.",
+            "nullable": true
+          },
+          "function_call": {
+            "type": "object",
+            "description": "The name and arguments of a function that should be called, as generated by the model.",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The name of the function to call."
+              },
+              "arguments": {
+                "type": "string",
+                "description": "The arguments to call the function with, as generated by the model in JSON format. Note that the model does not always generate valid JSON, and may hallucinate parameters not defined by your function schema. Validate the arguments in your code before calling your function."
+              }
+            }
           }
         },
         "required": [
-          "role",
-          "content"
+          "role"
         ]
+      },
+      "ChatCompletionStreamResponseDelta": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant",
+              "function"
+            ],
+            "description": "The role of the author of this message."
+          },
+          "content": {
+            "type": "string",
+            "description": "The contents of the chunk message.",
+            "nullable": true
+          },
+          "function_call": {
+            "type": "object",
+            "description": "The name and arguments of a function that should be called, as generated by the model.",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The name of the function to call."
+              },
+              "arguments": {
+                "type": "string",
+                "description": "The arguments to call the function with, as generated by the model in JSON format. Note that the model does not always generate valid JSON, and may hallucinate parameters not defined by your function schema. Validate the arguments in your code before calling your function."
+              }
+            }
+          }
+        }
       },
       "CreateChatCompletionRequest": {
         "type": "object",
         "properties": {
           "model": {
-            "description": "ID of the model to use. Currently, only `gpt-3.5-turbo` and `gpt-3.5-turbo-0301` are supported.",
-            "type": "string"
+            "description": "ID of the model to use. See the [model endpoint compatibility](/docs/models/model-endpoint-compatibility) table for details on which models work with the Chat API.",
+            "example": "gpt-3.5-turbo",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "gpt-4",
+                  "gpt-4-0314",
+                  "gpt-4-0613",
+                  "gpt-4-32k",
+                  "gpt-4-32k-0314",
+                  "gpt-4-32k-0613",
+                  "gpt-3.5-turbo",
+                  "gpt-3.5-turbo-16k",
+                  "gpt-3.5-turbo-0301",
+                  "gpt-3.5-turbo-0613",
+                  "gpt-3.5-turbo-16k-0613"
+                ]
+              }
+            ],
+            "x-oaiTypeLabel": "string"
           },
           "messages": {
-            "description": "The messages to generate chat completions for, in the [chat format](/docs/guides/chat/introduction).",
+            "description": "A list of messages comprising the conversation so far. [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_format_inputs_to_ChatGPT_models.ipynb).",
             "type": "array",
             "minItems": 1,
             "items": {
               "$ref": "#/components/schemas/ChatCompletionRequestMessage"
             }
+          },
+          "functions": {
+            "description": "A list of functions the model may generate JSON inputs for.",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ChatCompletionFunctions"
+            }
+          },
+          "function_call": {
+            "description": "Controls how the model responds to function calls. \"none\" means the model does not call a function, and responds to the end-user. \"auto\" means the model can pick between an end-user or calling a function.  Specifying a particular function via `{\"name\":\\ \"my_function\"}` forces the model to call that function. \"none\" is the default when no functions are present. \"auto\" is the default if functions are present.",
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "auto"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "The name of the function to call."
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            ]
           },
           "temperature": {
             "type": "number",
@@ -1614,7 +1590,7 @@
             "description": "How many chat completion choices to generate for each input message."
           },
           "stream": {
-            "description": "If set, partial message deltas will be sent, like in ChatGPT. Tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message.\n",
+            "description": "If set, partial message deltas will be sent, like in ChatGPT. Tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message. [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_stream_completions.ipynb).\n",
             "type": "boolean",
             "nullable": true,
             "default": false
@@ -1638,7 +1614,7 @@
             ]
           },
           "max_tokens": {
-            "description": "The maximum number of tokens allowed for the generated answer. By default, the number of tokens the model can return will be (4096 - prompt tokens).\n",
+            "description": "The maximum number of [tokens](/tokenizer) to generate in the chat completion.\n\nThe total length of input tokens and generated tokens is limited by the model's context length. [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb) for counting tokens.\n",
             "default": "inf",
             "type": "integer"
           },
@@ -1663,6 +1639,9 @@
             "x-oaiTypeLabel": "map",
             "default": null,
             "nullable": true,
+            "additionalProperties": {
+              "type": "integer"
+            },
             "description": "Modify the likelihood of specified tokens appearing in the completion.\n\nAccepts a json object that maps tokens (specified by their token ID in the tokenizer) to an associated bias value from -100 to 100. Mathematically, the bias is added to the logits generated by the model prior to sampling. The exact effect will vary per model, but values between -1 and 1 should decrease or increase likelihood of selection; values like -100 or 100 should result in a ban or exclusive selection of the relevant token.\n"
           },
           "user": {
@@ -1695,6 +1674,11 @@
             "type": "array",
             "items": {
               "type": "object",
+              "required": [
+                "index",
+                "message",
+                "finish_reason"
+              ],
               "properties": {
                 "index": {
                   "type": "integer"
@@ -1703,7 +1687,12 @@
                   "$ref": "#/components/schemas/ChatCompletionResponseMessage"
                 },
                 "finish_reason": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "stop",
+                    "length",
+                    "function_call"
+                  ]
                 }
               }
             }
@@ -1736,12 +1725,77 @@
           "choices"
         ]
       },
+      "CreateChatCompletionStreamResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string"
+          },
+          "created": {
+            "type": "integer"
+          },
+          "model": {
+            "type": "string"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "index",
+                "delta",
+                "finish_reason"
+              ],
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "delta": {
+                  "$ref": "#/components/schemas/ChatCompletionStreamResponseDelta"
+                },
+                "finish_reason": {
+                  "type": "string",
+                  "enum": [
+                    "stop",
+                    "length",
+                    "function_call"
+                  ],
+                  "nullable": true
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "created",
+          "model",
+          "choices"
+        ]
+      },
       "CreateEditRequest": {
         "type": "object",
         "properties": {
           "model": {
             "description": "ID of the model to use. You can use the `text-davinci-edit-001` or `code-davinci-edit-001` model with this endpoint.",
-            "type": "string"
+            "example": "text-davinci-edit-001",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "text-davinci-edit-001",
+                  "code-davinci-edit-001"
+                ]
+              }
+            ],
+            "x-oaiTypeLabel": "string"
           },
           "input": {
             "description": "The input text to use as a starting point for the edit.",
@@ -1801,6 +1855,11 @@
             "type": "array",
             "items": {
               "type": "object",
+              "required": [
+                "text",
+                "index",
+                "finish_reason"
+              ],
               "properties": {
                 "text": {
                   "type": "string"
@@ -1808,38 +1867,12 @@
                 "index": {
                   "type": "integer"
                 },
-                "logprobs": {
-                  "type": "object",
-                  "nullable": true,
-                  "properties": {
-                    "tokens": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "token_logprobs": {
-                      "type": "array",
-                      "items": {
-                        "type": "number"
-                      }
-                    },
-                    "top_logprobs": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "text_offset": {
-                      "type": "array",
-                      "items": {
-                        "type": "integer"
-                      }
-                    }
-                  }
-                },
                 "finish_reason": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "stop",
+                    "length"
+                  ]
                 }
               }
             }
@@ -2080,10 +2113,22 @@
           },
           "model": {
             "description": "Two content moderations models are available: `text-moderation-stable` and `text-moderation-latest`.\n\nThe default is `text-moderation-latest` which will be automatically upgraded over time. This ensures you are always using our most accurate model. If you use `text-moderation-stable`, we will provide advanced notice before updating the model. Accuracy of `text-moderation-stable` may be slightly lower than for `text-moderation-latest`.\n",
-            "type": "string",
             "nullable": false,
             "default": "text-moderation-latest",
-            "example": "text-moderation-stable"
+            "example": "text-moderation-stable",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "text-moderation-latest",
+                  "text-moderation-stable"
+                ]
+              }
+            ],
+            "x-oaiTypeLabel": "string"
           }
         },
         "required": [
@@ -2192,82 +2237,6 @@
           "results"
         ]
       },
-      "CreateSearchRequest": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "description": "Query to search against the documents.",
-            "type": "string",
-            "example": "the president",
-            "minLength": 1
-          },
-          "documents": {
-            "description": "Up to 200 documents to search over, provided as a list of strings.\n\nThe maximum document length (in tokens) is 2034 minus the number of tokens in the query.\n\nYou should specify either `documents` or a `file`, but not both.\n",
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 200,
-            "items": {
-              "type": "string"
-            },
-            "nullable": true,
-            "example": "['White House', 'hospital', 'school']"
-          },
-          "file": {
-            "description": "The ID of an uploaded file that contains documents to search over.\n\nYou should specify either `documents` or a `file`, but not both.\n",
-            "type": "string",
-            "nullable": true
-          },
-          "max_rerank": {
-            "description": "The maximum number of documents to be re-ranked and returned by search.\n\nThis flag only takes effect when `file` is set.\n",
-            "type": "integer",
-            "minimum": 1,
-            "default": 200,
-            "nullable": true
-          },
-          "return_metadata": {
-            "description": "A special boolean flag for showing metadata. If set to `true`, each document entry in the returned JSON will contain a \"metadata\" field.\n\nThis flag only takes effect when `file` is set.\n",
-            "type": "boolean",
-            "default": false,
-            "nullable": true
-          },
-          "user": {
-            "type": "string",
-            "example": "user-1234",
-            "description": "A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).\n"
-          }
-        },
-        "required": [
-          "query"
-        ]
-      },
-      "CreateSearchResponse": {
-        "type": "object",
-        "properties": {
-          "object": {
-            "type": "string"
-          },
-          "model": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "object": {
-                  "type": "string"
-                },
-                "document": {
-                  "type": "integer"
-                },
-                "score": {
-                  "type": "number"
-                }
-              }
-            }
-          }
-        }
-      },
       "ListFilesResponse": {
         "type": "object",
         "properties": {
@@ -2324,347 +2293,6 @@
           "deleted"
         ]
       },
-      "CreateAnswerRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "model": {
-            "description": "ID of the model to use for completion. You can select one of `ada`, `babbage`, `curie`, or `davinci`.",
-            "type": "string"
-          },
-          "question": {
-            "description": "Question to get answered.",
-            "type": "string",
-            "minLength": 1,
-            "example": "What is the capital of Japan?"
-          },
-          "examples": {
-            "description": "List of (question, answer) pairs that will help steer the model towards the tone and answer format you'd like. We recommend adding 2 to 3 examples.",
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 200,
-            "items": {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 2,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "example": "[['What is the capital of Canada?', 'Ottawa'], ['Which province is Ottawa in?', 'Ontario']]"
-          },
-          "examples_context": {
-            "description": "A text snippet containing the contextual information used to generate the answers for the `examples` you provide.",
-            "type": "string",
-            "example": "Ottawa, Canada's capital, is located in the east of southern Ontario, near the city of Montréal and the U.S. border."
-          },
-          "documents": {
-            "description": "List of documents from which the answer for the input `question` should be derived. If this is an empty list, the question will be answered based on the question-answer examples.\n\nYou should specify either `documents` or a `file`, but not both.\n",
-            "type": "array",
-            "maxItems": 200,
-            "items": {
-              "type": "string"
-            },
-            "example": "['Japan is an island country in East Asia, located in the northwest Pacific Ocean.', 'Tokyo is the capital and most populous prefecture of Japan.']",
-            "nullable": true
-          },
-          "file": {
-            "description": "The ID of an uploaded file that contains documents to search over. See [upload file](/docs/api-reference/files/upload) for how to upload a file of the desired format and purpose.\n\nYou should specify either `documents` or a `file`, but not both.\n",
-            "type": "string",
-            "nullable": true
-          },
-          "search_model": {
-            "description": "ID of the model to use for [Search](/docs/api-reference/searches/create). You can select one of `ada`, `babbage`, `curie`, or `davinci`.",
-            "type": "string",
-            "default": "ada",
-            "nullable": true
-          },
-          "max_rerank": {
-            "description": "The maximum number of documents to be ranked by [Search](/docs/api-reference/searches/create) when using `file`. Setting it to a higher value leads to improved accuracy but with increased latency and cost.",
-            "type": "integer",
-            "default": 200,
-            "nullable": true
-          },
-          "temperature": {
-            "description": "What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
-            "type": "number",
-            "default": 0,
-            "nullable": true
-          },
-          "logprobs": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 5,
-            "default": null,
-            "nullable": true,
-            "description": "Include the log probabilities on the `logprobs` most likely tokens, as well the chosen tokens. For example, if `logprobs` is 5, the API will return a list of the 5 most likely tokens. The API will always return the `logprob` of the sampled token, so there may be up to `logprobs+1` elements in the response.\n\nThe maximum value for `logprobs` is 5. If you need more than this, please contact us through our [Help center](https://help.openai.com) and describe your use case.\n\nWhen `logprobs` is set, `completion` will be automatically added into `expand` to get the logprobs.\n"
-          },
-          "max_tokens": {
-            "description": "The maximum number of tokens allowed for the generated answer",
-            "type": "integer",
-            "default": 16,
-            "nullable": true
-          },
-          "stop": {
-            "description": "Up to 4 sequences where the API will stop generating further tokens. The returned text will not contain the stop sequence.\n",
-            "default": null,
-            "oneOf": [
-              {
-                "type": "string",
-                "default": "<|endoftext|>",
-                "example": "\n"
-              },
-              {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 4,
-                "items": {
-                  "type": "string",
-                  "example": "[\"\\n\"]"
-                }
-              }
-            ],
-            "nullable": true
-          },
-          "n": {
-            "description": "How many answers to generate for each question.",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10,
-            "default": 1,
-            "nullable": true
-          },
-          "logit_bias": {
-            "type": "object",
-            "x-oaiTypeLabel": "map",
-            "default": null,
-            "nullable": true,
-            "description": "Modify the likelihood of specified tokens appearing in the completion.\n\nAccepts a json object that maps tokens (specified by their token ID in the GPT tokenizer) to an associated bias value from -100 to 100. You can use this [tokenizer tool](/tokenizer?view=bpe) (which works for both GPT-2 and GPT-3) to convert text to token IDs. Mathematically, the bias is added to the logits generated by the model prior to sampling. The exact effect will vary per model, but values between -1 and 1 should decrease or increase likelihood of selection; values like -100 or 100 should result in a ban or exclusive selection of the relevant token.\n\nAs an example, you can pass `{\"50256\": -100}` to prevent the <|endoftext|> token from being generated.\n"
-          },
-          "return_metadata": {
-            "description": "A special boolean flag for showing metadata. If set to `true`, each document entry in the returned JSON will contain a \"metadata\" field.\n\nThis flag only takes effect when `file` is set.\n",
-            "type": "boolean",
-            "default": false,
-            "nullable": true
-          },
-          "return_prompt": {
-            "description": "If set to `true`, the returned JSON will include a \"prompt\" field containing the final prompt that was used to request a completion. This is mainly useful for debugging purposes.",
-            "type": "boolean",
-            "default": false,
-            "nullable": true
-          },
-          "expand": {
-            "description": "If an object name is in the list, we provide the full information of the object; otherwise, we only provide the object ID. Currently we support `completion` and `file` objects for expansion.",
-            "type": "array",
-            "items": {},
-            "nullable": true,
-            "default": []
-          },
-          "user": {
-            "type": "string",
-            "example": "user-1234",
-            "description": "A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).\n"
-          }
-        },
-        "required": [
-          "model",
-          "question",
-          "examples",
-          "examples_context"
-        ]
-      },
-      "CreateAnswerResponse": {
-        "type": "object",
-        "properties": {
-          "object": {
-            "type": "string"
-          },
-          "model": {
-            "type": "string"
-          },
-          "search_model": {
-            "type": "string"
-          },
-          "completion": {
-            "type": "string"
-          },
-          "answers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "selected_documents": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "document": {
-                  "type": "integer"
-                },
-                "text": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      },
-      "CreateClassificationRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "model": {
-            "description": "ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them.",
-            "type": "string"
-          },
-          "query": {
-            "description": "Query to be classified.",
-            "type": "string",
-            "minLength": 1,
-            "example": "The plot is not very attractive."
-          },
-          "examples": {
-            "description": "A list of examples with labels, in the following format:\n\n`[[\"The movie is so interesting.\", \"Positive\"], [\"It is quite boring.\", \"Negative\"], ...]`\n\nAll the label strings will be normalized to be capitalized.\n\nYou should specify either `examples` or `file`, but not both.\n",
-            "type": "array",
-            "minItems": 2,
-            "maxItems": 200,
-            "items": {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 2,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "example": "[['Do not see this film.', 'Negative'], ['Smart, provocative and blisteringly funny.', 'Positive']]",
-            "nullable": true
-          },
-          "file": {
-            "description": "The ID of the uploaded file that contains training examples. See [upload file](/docs/api-reference/files/upload) for how to upload a file of the desired format and purpose.\n\nYou should specify either `examples` or `file`, but not both.\n",
-            "type": "string",
-            "nullable": true
-          },
-          "labels": {
-            "description": "The set of categories being classified. If not specified, candidate labels will be automatically collected from the examples you provide. All the label strings will be normalized to be capitalized.",
-            "type": "array",
-            "minItems": 2,
-            "maxItems": 200,
-            "default": null,
-            "items": {
-              "type": "string"
-            },
-            "example": [
-              "Positive",
-              "Negative"
-            ],
-            "nullable": true
-          },
-          "search_model": {
-            "description": "ID of the model to use for [Search](/docs/api-reference/searches/create). You can select one of `ada`, `babbage`, `curie`, or `davinci`.",
-            "type": "string",
-            "default": "ada",
-            "nullable": true
-          },
-          "temperature": {
-            "description": "What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.",
-            "type": "number",
-            "minimum": 0,
-            "maximum": 2,
-            "default": 0,
-            "nullable": true,
-            "example": 0
-          },
-          "logprobs": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 5,
-            "default": null,
-            "nullable": true,
-            "description": "Include the log probabilities on the `logprobs` most likely tokens, as well the chosen tokens. For example, if `logprobs` is 5, the API will return a list of the 5 most likely tokens. The API will always return the `logprob` of the sampled token, so there may be up to `logprobs+1` elements in the response.\n\nThe maximum value for `logprobs` is 5. If you need more than this, please contact us through our [Help center](https://help.openai.com) and describe your use case.\n\nWhen `logprobs` is set, `completion` will be automatically added into `expand` to get the logprobs.\n"
-          },
-          "max_examples": {
-            "description": "The maximum number of examples to be ranked by [Search](/docs/api-reference/searches/create) when using `file`. Setting it to a higher value leads to improved accuracy but with increased latency and cost.",
-            "type": "integer",
-            "default": 200,
-            "nullable": true
-          },
-          "logit_bias": {
-            "type": "object",
-            "x-oaiTypeLabel": "map",
-            "default": null,
-            "nullable": true,
-            "description": "Modify the likelihood of specified tokens appearing in the completion.\n\nAccepts a json object that maps tokens (specified by their token ID in the GPT tokenizer) to an associated bias value from -100 to 100. You can use this [tokenizer tool](/tokenizer?view=bpe) (which works for both GPT-2 and GPT-3) to convert text to token IDs. Mathematically, the bias is added to the logits generated by the model prior to sampling. The exact effect will vary per model, but values between -1 and 1 should decrease or increase likelihood of selection; values like -100 or 100 should result in a ban or exclusive selection of the relevant token.\n\nAs an example, you can pass `{\"50256\": -100}` to prevent the <|endoftext|> token from being generated.\n"
-          },
-          "return_prompt": {
-            "description": "If set to `true`, the returned JSON will include a \"prompt\" field containing the final prompt that was used to request a completion. This is mainly useful for debugging purposes.",
-            "type": "boolean",
-            "default": false,
-            "nullable": true
-          },
-          "return_metadata": {
-            "description": "A special boolean flag for showing metadata. If set to `true`, each document entry in the returned JSON will contain a \"metadata\" field.\n\nThis flag only takes effect when `file` is set.\n",
-            "type": "boolean",
-            "default": false,
-            "nullable": true
-          },
-          "expand": {
-            "description": "If an object name is in the list, we provide the full information of the object; otherwise, we only provide the object ID. Currently we support `completion` and `file` objects for expansion.",
-            "type": "array",
-            "items": {},
-            "nullable": true,
-            "default": []
-          },
-          "user": {
-            "type": "string",
-            "example": "user-1234",
-            "description": "A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).\n"
-          }
-        },
-        "required": [
-          "model",
-          "query"
-        ]
-      },
-      "CreateClassificationResponse": {
-        "type": "object",
-        "properties": {
-          "object": {
-            "type": "string"
-          },
-          "model": {
-            "type": "string"
-          },
-          "search_model": {
-            "type": "string"
-          },
-          "completion": {
-            "type": "string"
-          },
-          "label": {
-            "type": "string"
-          },
-          "selected_examples": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "document": {
-                  "type": "integer"
-                },
-                "text": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      },
       "CreateFineTuneRequest": {
         "type": "object",
         "properties": {
@@ -2682,8 +2310,23 @@
           "model": {
             "description": "The name of the base model to fine-tune. You can select one of \"ada\",\n\"babbage\", \"curie\", \"davinci\", or a fine-tuned model created after 2022-04-21.\nTo learn more about these models, see the\n[Models](https://platform.openai.com/docs/models) documentation.\n",
             "default": "curie",
-            "type": "string",
-            "nullable": true
+            "example": "curie",
+            "nullable": true,
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "ada",
+                  "babbage",
+                  "curie",
+                  "davinci"
+                ]
+              }
+            ],
+            "x-oaiTypeLabel": "string"
           },
           "n_epochs": {
             "description": "The number of epochs to train the model for. An epoch refers to one\nfull cycle through the training dataset.\n",
@@ -2796,11 +2439,23 @@
         "additionalProperties": false,
         "properties": {
           "model": {
-            "description": "ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them.",
-            "type": "string"
+            "description": "ID of the model to use. You can use the [List models](/docs/api-reference/models/list) API to see all of your available models, or see our [Model overview](/docs/models/overview) for descriptions of them.\n",
+            "example": "text-embedding-ada-002",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "text-embedding-ada-002"
+                ]
+              }
+            ],
+            "x-oaiTypeLabel": "string"
           },
           "input": {
-            "description": "Input text to get embeddings for, encoded as a string or array of tokens. To get embeddings for multiple inputs in a single request, pass an array of strings or array of token arrays. Each input must not exceed 8192 tokens in length.\n",
+            "description": "Input text to embed, encoded as a string or array of tokens. To embed multiple inputs in a single request, pass an array of strings or array of token arrays. Each input must not exceed the max input tokens for the model (8191 tokens for `text-embedding-ada-002`). [Example Python code](https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb) for counting tokens.\n",
             "example": "The quick brown fox jumped over the lazy dog",
             "oneOf": [
               {
@@ -2911,13 +2566,26 @@
         "additionalProperties": false,
         "properties": {
           "file": {
-            "description": "The audio file to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.\n",
+            "description": "The audio file object (not file name) to transcribe, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.\n",
             "type": "string",
+            "x-oaiTypeLabel": "file",
             "format": "binary"
           },
           "model": {
             "description": "ID of the model to use. Only `whisper-1` is currently available.\n",
-            "type": "string"
+            "example": "whisper-1",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "whisper-1"
+                ]
+              }
+            ],
+            "x-oaiTypeLabel": "string"
           },
           "prompt": {
             "description": "An optional text to guide the model's style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should match the audio language.\n",
@@ -2926,6 +2594,13 @@
           "response_format": {
             "description": "The format of the transcript output, in one of these options: json, text, srt, verbose_json, or vtt.\n",
             "type": "string",
+            "enum": [
+              "json",
+              "text",
+              "srt",
+              "verbose_json",
+              "vtt"
+            ],
             "default": "json"
           },
           "temperature": {
@@ -2959,13 +2634,26 @@
         "additionalProperties": false,
         "properties": {
           "file": {
-            "description": "The audio file to translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.\n",
+            "description": "The audio file object (not file name) translate, in one of these formats: mp3, mp4, mpeg, mpga, m4a, wav, or webm.\n",
             "type": "string",
+            "x-oaiTypeLabel": "file",
             "format": "binary"
           },
           "model": {
             "description": "ID of the model to use. Only `whisper-1` is currently available.\n",
-            "type": "string"
+            "example": "whisper-1",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "whisper-1"
+                ]
+              }
+            ],
+            "x-oaiTypeLabel": "string"
           },
           "prompt": {
             "description": "An optional text to guide the model's style or continue a previous audio segment. The [prompt](/docs/guides/speech-to-text/prompting) should be in English.\n",
@@ -2996,30 +2684,6 @@
         },
         "required": [
           "text"
-        ]
-      },
-      "Engine": {
-        "title": "Engine",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "object": {
-            "type": "string"
-          },
-          "created": {
-            "type": "integer",
-            "nullable": true
-          },
-          "ready": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "object",
-          "created",
-          "ready"
         ]
       },
       "Model": {
@@ -3070,7 +2734,7 @@
             "type": "string"
           },
           "status_details": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           }
         },
@@ -3112,7 +2776,36 @@
             "type": "string"
           },
           "hyperparams": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "n_epochs": {
+                "type": "integer"
+              },
+              "batch_size": {
+                "type": "integer"
+              },
+              "prompt_loss_weight": {
+                "type": "number"
+              },
+              "learning_rate_multiplier": {
+                "type": "number"
+              },
+              "compute_classification_metrics": {
+                "type": "boolean"
+              },
+              "classification_positive_class": {
+                "type": "string"
+              },
+              "classification_n_classes": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "n_epochs",
+              "batch_size",
+              "prompt_loss_weight",
+              "learning_rate_multiplier"
+            ]
           },
           "training_files": {
             "type": "array",
@@ -3187,19 +2880,14 @@
         "description": "List and describe the various models available in the API. You can refer to the [Models](/docs/models) documentation to understand what models are available and the differences between them.\n"
       },
       {
-        "id": "completions",
-        "title": "Completions",
-        "description": "Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.\n"
-      },
-      {
         "id": "chat",
         "title": "Chat",
-        "description": "Given a chat conversation, the model will return a chat completion response.\n"
+        "description": "Given a list of messages comprising a conversation, the model will return a response.\n"
       },
       {
-        "id": "edits",
-        "title": "Edits",
-        "description": "Given a prompt and an instruction, the model will return an edited version of the prompt.\n"
+        "id": "completions",
+        "title": "Completions",
+        "description": "Given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position. Note: We recommend most users use our Chat Completions API. [Learn more](/docs/deprecations/2023-07-06-gpt-and-embeddings)\n"
       },
       {
         "id": "images",
@@ -3232,40 +2920,9 @@
         "description": "Given a input text, outputs if the model classifies it as violating OpenAI's content policy.\n\nRelated guide: [Moderations](/docs/guides/moderation)\n"
       },
       {
-        "id": "searches",
-        "title": "Searches",
-        "warning": {
-          "title": "This endpoint is deprecated and will be removed on December 3rd, 2022",
-          "message": "We’ve developed new methods with better performance. [Learn more](https://help.openai.com/en/articles/6272952-search-transition-guide)."
-        },
-        "description": "Given a query and a set of documents or labels, the model ranks each document based on its semantic similarity to the provided query.\n\nRelated guide: [Search](/docs/guides/search)\n"
-      },
-      {
-        "id": "classifications",
-        "title": "Classifications",
-        "warning": {
-          "title": "This endpoint is deprecated and will be removed on December 3rd, 2022",
-          "message": "We’ve developed new methods with better performance. [Learn more](https://help.openai.com/en/articles/6272941-classifications-transition-guide)."
-        },
-        "description": "Given a query and a set of labeled examples, the model will predict the most likely label for the query. Useful as a drop-in replacement for any ML classification or text-to-label task.\n\nRelated guide: [Classification](/docs/guides/classifications)\n"
-      },
-      {
-        "id": "answers",
-        "title": "Answers",
-        "warning": {
-          "title": "This endpoint is deprecated and will be removed on December 3rd, 2022",
-          "message": "We’ve developed new methods with better performance. [Learn more](https://help.openai.com/en/articles/6233728-answers-transition-guide)."
-        },
-        "description": "Given a question, a set of documents, and some examples, the API generates an answer to the question based on the information in the set of documents. This is useful for question-answering applications on sources of truth, like company documentation or a knowledge base.\n\nRelated guide: [Question answering](/docs/guides/answers)\n"
-      },
-      {
-        "id": "engines",
-        "title": "Engines",
-        "description": "These endpoints describe and provide access to the various engines available in the API.",
-        "warning": {
-          "title": "The Engines endpoints are deprecated.",
-          "message": "Please use their replacement, [Models](/docs/api-reference/models), instead. [Learn more](https://help.openai.com/TODO)."
-        }
+        "id": "edits",
+        "title": "Edits",
+        "description": "Given a prompt and an instruction, the model will return an edited version of the prompt.\n"
       }
     ]
   }
