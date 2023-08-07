@@ -25,13 +25,14 @@
 
   ; end to end test deps
 
-  (multipart_form (and :with-test (>= 0.5.0)))
-  (multipart_form-lwt (and :with-test (>= 0.5.0)))
-  (multipart_form-cohttp-lwt (and :with-test (>= 0.5.0)))
-  (uuidm :with-test)
-  (cohttp-lwt-unix :with-test)
-  (tls :with-test)
-  (tls-lwt :with-test)
+  (multipart_form (>= 0.5.0))
+  (multipart_form-lwt (>= 0.5.0))
+  (multipart_form-cohttp-lwt (>= 0.5.0))
+  uuidm
+  cohttp-lwt-unix
+  tls
+  tls-lwt
+
   (ppx_deriving_yojson :with-test)
   (ppx_deriving :with-test)
 
