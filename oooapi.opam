@@ -9,10 +9,9 @@ homepage: "https://github.com/shonfeder/ooopai"
 bug-reports: "https://github.com/shonfeder/ooopai/issues"
 depends: [
   "dune" {>= "2.9" & > "2.9"}
-  "atdgen" {>= "2.11.0"}
+  "opeanapi_spec"
   "ppxlib" {>= "0.28.0"}
   "camelsnakekebab" {>= "0.4"}
-  "json-data-encoding" {>= "0.12.1"}
   "multipart_form" {>= "0.5.0"}
   "multipart_form-lwt" {>= "0.5.0"}
   "multipart_form-cohttp-lwt" {>= "0.5.0"}
