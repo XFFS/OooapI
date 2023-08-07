@@ -5,6 +5,5 @@
   compiler-libs
   ppxlib
   camelsnakekebab
-  cohttp-lwt-unix               ;TODO tmp
-  datalog.caml_interface)
+  cohttp-lwt-unix)
  (preprocess (pps ppxlib.metaquot)))
