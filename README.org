@@ -12,5 +12,7 @@ Using https://github.com/kislyuk/yq
 #+begin_src sh
 yq < ./thespec.yaml > ./thespec.json
 #+end_src
+
 * Tasks
 ** TODO Automate conversion of yaml to json for specs, via yq
+** TODO Support url encoded forms
