@@ -15,7 +15,7 @@
  (depends
   (dune (> 2.9))
 
-  opeanapi_spec
+  openapi_spec
 
   (ppxlib (>= 0.28.0))
   (camelsnakekebab (>= 0.4))

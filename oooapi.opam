@@ -9,7 +9,7 @@ homepage: "https://github.com/shonfeder/ooopai"
 bug-reports: "https://github.com/shonfeder/ooopai/issues"
 depends: [
   "dune" {>= "2.9" & > "2.9"}
-  "opeanapi_spec"
+  "openapi_spec"
   "ppxlib" {>= "0.28.0"}
   "camelsnakekebab" {>= "0.4"}
   "multipart_form" {>= "0.5.0"}
