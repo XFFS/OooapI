@@ -1,5 +1,6 @@
 open Tezt
 open Tezt.Base
+open Lib
 
 let test ?(tags = [ "dag" ]) title f = Test.register ~__FILE__ ~title ~tags f;;
 

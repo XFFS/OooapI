@@ -1,3 +1,5 @@
+open Lib
+
 let () =
   let spec_file = ref "" in
   Arg.parse [] (fun f -> spec_file := f) "oooapi <spec_file>";

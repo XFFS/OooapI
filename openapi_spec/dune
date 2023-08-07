@@ -1,6 +1,6 @@
 (library
  (public_name openapi_spec)
- (libraries atdgen json-data-encoding))
+ (libraries atdgen json_data_encoding))
 
 (rule
  (targets openapi_j.ml

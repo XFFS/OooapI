@@ -1,5 +1,5 @@
 (library
- (public_name oooapi)
+ (name lib)
  (libraries
   openapi_spec
   compiler-libs

@@ -1,33 +1,32 @@
 (library
  (name json_data_encoding_stdlib)
- (public_name json-data-encoding.stdlib)
  (flags
   (:standard -w -9))
  (modules json_data_encoding_stdlib list_override)
  (synopsis "Type-safe encoding to and decoding from JSON")
  (libraries uri)
  ; (js_of_ocaml)
- (wrapped false))
+ (wrapped false)
+ (package openapi_spec))
 
 (library
  (name json_data_encoding)
- (public_name json-data-encoding)
  (flags
   (:standard -w -9 -open Json_data_encoding_stdlib))
  (modules json_encoding json_query json_repr json_schema)
  (synopsis "Type-safe encoding to and decoding from JSON")
  (libraries uri json_data_encoding_stdlib)
  ; (js_of_ocaml)
- (wrapped false))
+ (wrapped false)
+ (package openapi_spec))
 
 (library
  (name json_data_encoding_bson)
- (public_name json-data-encoding-bson)
  (flags
   (:standard -w -9 -open Json_data_encoding_stdlib))
  (modules json_repr_bson)
  (synopsis "BSON representation of JSON documents")
- (libraries json-data-encoding ocplib-endian json_data_encoding_stdlib)
+ (libraries json_data_encoding ocplib-endian json_data_encoding_stdlib)
  ; (js_of_ocaml)
  (wrapped false))
 

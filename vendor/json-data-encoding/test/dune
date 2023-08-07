@@ -2,8 +2,7 @@
  (names test_generated test_big_streaming test_mu test_list_map
    test_seq_is_lazy)
  (modes native js)
- (libraries json-data-encoding crowbar alcotest)
- (package json-data-encoding))
+ (libraries json-data-encoding crowbar alcotest))
 
 (rule
  (alias runtest_js)
