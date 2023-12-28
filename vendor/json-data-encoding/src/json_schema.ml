@@ -35,24 +35,24 @@ let version = "http://json-schema.org/draft-04/schema#"
 
 (* The root of a schema with the named definitions,
    a precomputed ID-element map and a cache for external documents. *)
-type schema = {
-  root : element;
-  source : Uri.t;
-  (* whose fragment should be empty *)
-  definitions : (path * element) list;
-  ids : (string * element) list;
-  world : schema list;
-}
+type schema =
+  { root : element
+  ; source : Uri.t
+  ; (* whose fragment should be empty *)
+    definitions : (path * element) list
+  ; ids : (string * element) list
+  ; world : schema list
+  }
 
-and element = {
-  title : string option;
-  description : string option;
-  default : Json_repr.any option;
-  enum : Json_repr.any list option;
-  kind : element_kind;
-  format : string option;
-  id : string option;
-}
+and element =
+  { title : string option
+  ; description : string option
+  ; default : Json_repr.any option
+  ; enum : Json_repr.any list option
+  ; kind : element_kind
+  ; format : string option
+  ; id : string option
+  }
 
 and element_kind =
   | Object of object_specs
@@ -70,51 +70,55 @@ and element_kind =
   | Any
   | Dummy
 
-and combinator = Any_of | One_of | All_of | Not
+and combinator =
+  | Any_of
+  | One_of
+  | All_of
+  | Not
 
-and array_specs = {
-  min_items : int;
-  max_items : int option;
-  unique_items : bool;
-  additional_items : element option;
-}
+and array_specs =
+  { min_items : int
+  ; max_items : int option
+  ; unique_items : bool
+  ; additional_items : element option
+  }
 
-and numeric_specs = {
-  multiple_of : float option;
-  minimum : (float * [`Inclusive | `Exclusive]) option;
-  maximum : (float * [`Inclusive | `Exclusive]) option;
-}
+and numeric_specs =
+  { multiple_of : float option
+  ; minimum : (float * [ `Inclusive | `Exclusive ]) option
+  ; maximum : (float * [ `Inclusive | `Exclusive ]) option
+  }
 
-and object_specs = {
-  properties : (string * element * bool * Json_repr.any option) list;
-  pattern_properties : (string * element) list;
-  additional_properties : element option;
-  min_properties : int;
-  max_properties : int option;
-  schema_dependencies : (string * element) list;
-  property_dependencies : (string * string list) list;
-}
+and object_specs =
+  { properties : (string * element * bool * Json_repr.any option) list
+  ; nullable : bool
+  ; pattern_properties : (string * element) list
+  ; additional_properties : element option
+  ; min_properties : int
+  ; max_properties : int option
+  ; schema_dependencies : (string * element) list
+  ; property_dependencies : (string * string list) list
+  }
 
-and string_specs = {
-  pattern : string option;
-  min_length : int;
-  max_length : int option;
-  str_format : string option;
-}
+and string_specs =
+  { pattern : string option
+  ; min_length : int
+  ; max_length : int option
+  ; str_format : string option
+  }
 
 let sort_assoc_list_by_string_key kvs =
   List.sort (fun (a, _) (b, _) -> String.compare a b) kvs
 
 (* box an element kind without any optional field *)
 let element kind =
-  {
-    title = None;
-    description = None;
-    default = None;
-    kind;
-    format = None;
-    enum = None;
-    id = None;
+  { title = None
+  ; description = None
+  ; default = None
+  ; kind
+  ; format = None
+  ; enum = None
+  ; id = None
   }
 
 (*-- equality --------------------------------------------------------------*)
@@ -127,7 +131,9 @@ let rec eq_element a b =
         = Option.map Json_repr.from_any b.default
      && Option.map (List.map Json_repr.from_any) a.enum
         = Option.map (List.map Json_repr.from_any) b.enum
-     && eq_kind a.kind b.kind && a.format = b.format && a.id = b.id
+     && eq_kind a.kind b.kind
+     && a.format = b.format
+     && a.id = b.id
 
 and eq_kind a b =
   match (a, b) with
@@ -174,7 +180,9 @@ and eq_object_specs a b =
   && List.compare_lengths a.properties b.properties = 0
   && List.for_all2
        (fun (na, ea, ra, da) (nb, eb, rb, db) ->
-         String.equal na nb && eq_element ea eb && ra = rb
+         String.equal na nb
+         && eq_element ea eb
+         && ra = rb
          && Option.map Json_repr.from_any da = Option.map Json_repr.from_any db)
        (List.sort
           (fun (x, _, _, _) (y, _, _, _) -> String.compare x y)
@@ -184,7 +192,8 @@ and eq_object_specs a b =
           b.properties)
 
 and eq_array_specs a b =
-  a.min_items = b.min_items && a.max_items = b.max_items
+  a.min_items = b.min_items
+  && a.max_items = b.max_items
   && a.unique_items = b.unique_items
   &&
   match (a.additional_items, b.additional_items) with
@@ -197,10 +206,14 @@ and eq_array_specs a b =
 let pp_string ppf s = Json_repr.(pp (module Ezjsonm)) ppf (`String s)
 
 let pp_num ppf num =
-  if abs_float num < 1000. then Format.fprintf ppf "%g" num
+  if abs_float num < 1000. then
+    Format.fprintf ppf "%g" num
   else
     let is_positive, abs_num =
-      if num < 0. then (false, ~-.num) else (true, num)
+      if num < 0. then
+        (false, ~-.num)
+      else
+        (true, num)
     in
     let already_printed =
       List.fold_left
@@ -212,20 +225,26 @@ let pp_num ppf num =
             Format.fprintf
               ppf
               "%s2^%g"
-              (if is_positive then "" else "-")
-              candidate ;
+              (if is_positive then
+                 ""
+               else
+                 "-")
+              candidate;
             if (is_positive && delta < 0.) || ((not is_positive) && delta > 0.)
-            then Format.fprintf ppf "+%g" (abs_float delta) ;
+            then
+              Format.fprintf ppf "+%g" (abs_float delta);
             if (is_positive && delta > 0.) || ((not is_positive) && delta < 0.)
-            then Format.fprintf ppf "-%g" (abs_float delta) ;
-            true)
-          else false)
+            then
+              Format.fprintf ppf "-%g" (abs_float delta);
+            true
+          ) else
+            false)
         false
-        [0.; 1.; -1.; 2.; -2.]
+        [ 0.; 1.; -1.; 2.; -2. ]
     in
     if not already_printed then Format.fprintf ppf "%f" abs_num
 
-let pp_numeric_specs ppf {multiple_of; minimum; maximum} =
+let pp_numeric_specs ppf { multiple_of; minimum; maximum } =
   Format.fprintf
     ppf
     "%a%a%a"
@@ -234,7 +253,9 @@ let pp_numeric_specs ppf {multiple_of; minimum; maximum} =
       | Some v -> Format.fprintf ppf "multiple of %g" v)
     multiple_of
     (fun ppf -> function
-      | None, _, _ | _, None, None -> ()
+      | None, _, _
+      | _, None, None ->
+          ()
       | _ -> Format.fprintf ppf ", ")
     (multiple_of, minimum, maximum)
     (fun ppf -> function
@@ -256,18 +277,18 @@ let pp_numeric_specs ppf {multiple_of; minimum; maximum} =
     (minimum, maximum)
 
 let pp_path ppf = function
-  | [`Field "definitions"; `Field name] -> Format.fprintf ppf "%s" name
+  | [ `Field "definitions"; `Field name ] -> Format.fprintf ppf "%s" name
   | path -> Json_query.(print_path_as_json_path ~wildcards:true) ppf path
 
 let pp_desc element =
   match element with
-  | {title = None; description = None} -> None
-  | {title = Some text; description = None}
-  | {title = None; description = Some text} ->
+  | { title = None; description = None } -> None
+  | { title = Some text; description = None }
+  | { title = None; description = Some text } ->
       Some
         (fun ppf () ->
           Format.fprintf ppf "/* @[<hov 0>%a@] */" Format.pp_print_text text)
-  | {title = Some title; description = Some description} ->
+  | { title = Some title; description = Some description } ->
       Some
         (fun ppf () ->
           Format.fprintf
@@ -281,183 +302,142 @@ let pp_desc element =
 let rec pp_element ppf element =
   match element.id with
   | Some id -> Format.fprintf ppf "#%s" id
-  | None -> (
-      match element.format with
-      | Some format -> Format.fprintf ppf "%s" format
-      | None -> (
-          match element.enum with
-          | Some cases ->
-              let pp_sep ppf () = Format.fprintf ppf "@ | " in
-              Format.fprintf
-                ppf
-                "@[<hv 0>%a@]"
-                (Format.pp_print_list
-                   ~pp_sep
-                   (Json_repr.pp_any ~compact:false ()))
-                cases
-          | None -> (
-              match pp_desc element with
-              | Some pp_desc -> (
-                  let stripped =
-                    {element with title = None; description = None}
-                  in
-                  match element.kind with
-                  | Combine _ ->
-                      Format.fprintf ppf "%a@,%a" pp_desc () pp_element stripped
-                  | Object specs ->
-                      Format.fprintf
-                        ppf
-                        "@[<v 2>{ %a@,%a }@]"
-                        pp_desc
-                        ()
-                        pp_object_contents
-                        specs
-                  | _ ->
-                      Format.fprintf ppf "%a@ %a" pp_element stripped pp_desc ()
-                  )
-              | None -> (
-                  match element.kind with
-                  | String {pattern; min_length; max_length; str_format} -> (
-                      let length_pp ppf = function
-                        | n, None when n > 0 ->
-                            Format.fprintf ppf " (%d <= length)" n
-                        | _, None -> Format.fprintf ppf ""
-                        | n, Some m when n > 0 ->
-                            Format.fprintf ppf " (%d <= length <= %d)" n m
-                        | _, Some n -> Format.fprintf ppf " (length <= %d)" n
-                      in
-                      match (pattern, str_format) with
-                      | None, None ->
-                          Format.fprintf
-                            ppf
-                            "string%a"
-                            length_pp
-                            (min_length, max_length)
-                      | Some pat, None ->
-                          Format.fprintf
-                            ppf
-                            "/%s/%a"
-                            pat
-                            length_pp
-                            (min_length, max_length)
-                      | None, Some fmt ->
-                          Format.fprintf
-                            ppf
-                            "%s%a"
-                            fmt
-                            length_pp
-                            (min_length, max_length)
-                      | Some pat, Some fmt ->
-                          Format.fprintf
-                            ppf
-                            "%s (/%s/)%a"
-                            fmt
-                            pat
-                            length_pp
-                            (min_length, max_length))
-                  | Integer {multiple_of = None; minimum = None; maximum = None}
-                    ->
-                      Format.fprintf ppf "integer"
-                  | Integer specs ->
-                      Format.fprintf ppf "integer %a" pp_numeric_specs specs
-                  | Number {multiple_of = None; minimum = None; maximum = None}
-                    ->
-                      Format.fprintf ppf "number"
-                  | Number specs ->
-                      Format.fprintf ppf "number %a" pp_numeric_specs specs
-                  | Id_ref id -> Format.fprintf ppf "#%s" id
-                  | Def_ref path -> Format.fprintf ppf "$%a" pp_path path
-                  | Ext_ref uri -> Format.fprintf ppf "$%a" Uri.pp_hum uri
-                  | Boolean -> Format.fprintf ppf "boolean"
-                  | Null -> Format.fprintf ppf "null"
-                  | Any -> Format.fprintf ppf "any"
-                  | Dummy -> assert false
-                  | Combine (Not, [elt]) ->
-                      Format.fprintf ppf "! %a" pp_element elt
-                  | Combine (c, elts) ->
-                      let pp_sep ppf () =
-                        match c with
-                        | Any_of -> Format.fprintf ppf "@ | "
-                        | One_of -> Format.fprintf ppf "@ || "
-                        | All_of -> Format.fprintf ppf "@ && "
-                        | _ -> assert false
-                      in
-                      Format.fprintf
-                        ppf
-                        "@[<hv 0>%a@]"
-                        (Format.pp_print_list ~pp_sep pp_element)
-                        elts
-                  | Object
-                      {
-                        properties = [];
-                        pattern_properties = [];
-                        additional_properties = None;
-                        min_properties = 0;
-                        max_properties = Some 0;
-                        schema_dependencies = [];
-                        property_dependencies = [];
-                      } ->
-                      Format.fprintf ppf "{}"
-                  | Object specs ->
-                      Format.fprintf
-                        ppf
-                        "@[<v 2>{ %a }@]"
-                        pp_object_contents
-                        specs
-                  | Array (_, {max_items = Some 0})
-                  | Monomorphic_array (_, {max_items = Some 0}) ->
-                      Format.fprintf ppf "[]"
-                  | Array (elements, {additional_items}) ->
-                      let pp_sep =
-                        let first = ref true in
-                        fun ppf () ->
-                          if !first then first := false
-                          else Format.fprintf ppf ",@ "
-                      in
-                      Format.fprintf ppf "@[<hv 2>[ " ;
-                      List.iter
-                        (fun elt ->
-                          Format.fprintf ppf "%a%a" pp_sep () pp_element elt)
-                        elements ;
-                      (match additional_items with
-                      | None -> ()
-                      | Some {kind = Any} ->
-                          Format.fprintf ppf "%a,@ ..." pp_sep ()
-                      | Some elt ->
-                          Format.fprintf
-                            ppf
-                            "%a,@ %a ..."
-                            pp_sep
-                            ()
-                            pp_element
-                            elt) ;
-                      Format.fprintf ppf " ]@]"
-                  | Monomorphic_array (elt, {additional_items = None}) ->
-                      Format.fprintf ppf "[ %a ... ]" pp_element elt
-                  | Monomorphic_array
-                      (elt, {additional_items = Some {kind = Any}}) ->
-                      Format.fprintf
-                        ppf
-                        "@[<hv 2>[ %a ...,@ ... ]@]"
-                        pp_element
-                        elt
-                  | Monomorphic_array (elt, {additional_items = Some add_elt})
-                    ->
-                      (* TODO: find a good way to print length *)
-                      Format.fprintf
-                        ppf
-                        "@[<hv 2>[ %a ...,@ %a ... ]@]"
-                        pp_element
-                        elt
-                        pp_element
-                        add_elt))))
+  | None ->
+  match element.format with
+  | Some format -> Format.fprintf ppf "%s" format
+  | None ->
+  match element.enum with
+  | Some cases ->
+      let pp_sep ppf () = Format.fprintf ppf "@ | " in
+      Format.fprintf
+        ppf
+        "@[<hv 0>%a@]"
+        (Format.pp_print_list ~pp_sep (Json_repr.pp_any ~compact:false ()))
+        cases
+  | None ->
+  match pp_desc element with
+  | Some pp_desc -> (
+      let stripped = { element with title = None; description = None } in
+      match element.kind with
+      | Combine _ -> Format.fprintf ppf "%a@,%a" pp_desc () pp_element stripped
+      | Object specs ->
+          Format.fprintf
+            ppf
+            "@[<v 2>{ %a@,%a }@]"
+            pp_desc
+            ()
+            pp_object_contents
+            specs
+      | _ -> Format.fprintf ppf "%a@ %a" pp_element stripped pp_desc ())
+  | None ->
+  match element.kind with
+  | String { pattern; min_length; max_length; str_format } -> (
+      let length_pp ppf = function
+        | n, None when n > 0 -> Format.fprintf ppf " (%d <= length)" n
+        | _, None -> Format.fprintf ppf ""
+        | n, Some m when n > 0 -> Format.fprintf ppf " (%d <= length <= %d)" n m
+        | _, Some n -> Format.fprintf ppf " (length <= %d)" n
+      in
+      match (pattern, str_format) with
+      | None, None ->
+          Format.fprintf ppf "string%a" length_pp (min_length, max_length)
+      | Some pat, None ->
+          Format.fprintf ppf "/%s/%a" pat length_pp (min_length, max_length)
+      | None, Some fmt ->
+          Format.fprintf ppf "%s%a" fmt length_pp (min_length, max_length)
+      | Some pat, Some fmt ->
+          Format.fprintf
+            ppf
+            "%s (/%s/)%a"
+            fmt
+            pat
+            length_pp
+            (min_length, max_length))
+  | Integer { multiple_of = None; minimum = None; maximum = None } ->
+      Format.fprintf ppf "integer"
+  | Integer specs -> Format.fprintf ppf "integer %a" pp_numeric_specs specs
+  | Number { multiple_of = None; minimum = None; maximum = None } ->
+      Format.fprintf ppf "number"
+  | Number specs -> Format.fprintf ppf "number %a" pp_numeric_specs specs
+  | Id_ref id -> Format.fprintf ppf "#%s" id
+  | Def_ref path -> Format.fprintf ppf "$%a" pp_path path
+  | Ext_ref uri -> Format.fprintf ppf "$%a" Uri.pp_hum uri
+  | Boolean -> Format.fprintf ppf "boolean"
+  | Null -> Format.fprintf ppf "null"
+  | Any -> Format.fprintf ppf "any"
+  | Dummy -> assert false
+  | Combine (Not, [ elt ]) -> Format.fprintf ppf "! %a" pp_element elt
+  | Combine (c, elts) ->
+      let pp_sep ppf () =
+        match c with
+        | Any_of -> Format.fprintf ppf "@ | "
+        | One_of -> Format.fprintf ppf "@ || "
+        | All_of -> Format.fprintf ppf "@ && "
+        | _ -> assert false
+      in
+      Format.fprintf
+        ppf
+        "@[<hv 0>%a@]"
+        (Format.pp_print_list ~pp_sep pp_element)
+        elts
+  | Object
+      { properties = []
+      ; pattern_properties = []
+      ; additional_properties = None
+      ; min_properties = 0
+      ; max_properties = Some 0
+      ; schema_dependencies = []
+      ; property_dependencies = []
+      } ->
+      Format.fprintf ppf "{}"
+  | Object specs ->
+      Format.fprintf ppf "@[<v 2>{ %a }@]" pp_object_contents specs
+  | Array (_, { max_items = Some 0 })
+  | Monomorphic_array (_, { max_items = Some 0 }) ->
+      Format.fprintf ppf "[]"
+  | Array (elements, { additional_items }) ->
+      let pp_sep =
+        let first = ref true in
+        fun ppf () ->
+          if !first then
+            first := false
+          else
+            Format.fprintf ppf ",@ "
+      in
+      Format.fprintf ppf "@[<hv 2>[ ";
+      List.iter
+        (fun elt -> Format.fprintf ppf "%a%a" pp_sep () pp_element elt)
+        elements;
+      (match additional_items with
+      | None -> ()
+      | Some { kind = Any } -> Format.fprintf ppf "%a,@ ..." pp_sep ()
+      | Some elt -> Format.fprintf ppf "%a,@ %a ..." pp_sep () pp_element elt);
+      Format.fprintf ppf " ]@]"
+  | Monomorphic_array (elt, { additional_items = None }) ->
+      Format.fprintf ppf "[ %a ... ]" pp_element elt
+  | Monomorphic_array (elt, { additional_items = Some { kind = Any } }) ->
+      Format.fprintf ppf "@[<hv 2>[ %a ...,@ ... ]@]" pp_element elt
+  | Monomorphic_array (elt, { additional_items = Some add_elt }) ->
+      (* TODO: find a good way to print length *)
+      Format.fprintf
+        ppf
+        "@[<hv 2>[ %a ...,@ %a ... ]@]"
+        pp_element
+        elt
+        pp_element
+        add_elt
 
-and pp_object_contents ppf
-    {properties; pattern_properties; additional_properties} =
+and pp_object_contents
+    ppf
+    { properties; pattern_properties; additional_properties } =
   (* TODO: find a good way to print length / dependencies *)
   let pp_sep =
     let first = ref true in
-    fun ppf () -> if !first then first := false else Format.fprintf ppf ",@ "
+    fun ppf () ->
+      if !first then
+        first := false
+      else
+        Format.fprintf ppf ",@ "
   in
   List.iter
     (fun (name, elt, req, _) ->
@@ -468,29 +448,32 @@ and pp_object_contents ppf
         ()
         pp_string
         name
-        (if req then "" else "?")
+        (if req then
+           ""
+         else
+           "?")
         pp_element
         elt)
-    properties ;
+    properties;
   List.iter
     (fun (name, elt) ->
       Format.fprintf ppf "%a@[<hv 2>/%s/:@ %a@]" pp_sep () name pp_element elt)
-    pattern_properties ;
+    pattern_properties;
   match additional_properties with
   | None -> ()
-  | Some {kind = Any} -> Format.fprintf ppf "%a..." pp_sep ()
+  | Some { kind = Any } -> Format.fprintf ppf "%a..." pp_sep ()
   | Some elt -> Format.fprintf ppf "%a@[<hv 2>*:@ %a@]" pp_sep () pp_element elt
 
 let pp ppf schema =
-  Format.fprintf ppf "@[<v 0>" ;
-  pp_element ppf schema.root ;
+  Format.fprintf ppf "@[<v 0>";
+  pp_element ppf schema.root;
   List.iter
     (fun (path, elt) ->
       match pp_desc elt with
       | None ->
           Format.fprintf ppf "@,@[<hv 2>$%a:@ %a@]" pp_path path pp_element elt
       | Some pp_desc ->
-          let stripped = {elt with title = None; description = None} in
+          let stripped = { elt with title = None; description = None } in
           Format.fprintf
             ppf
             "@,@[<v 2>$%a:@,%a@,%a@]"
@@ -500,7 +483,7 @@ let pp ppf schema =
             ()
             pp_element
             stripped)
-    schema.definitions ;
+    schema.definitions;
   List.iter
     (fun (id, elt) ->
       match pp_desc elt with
@@ -510,10 +493,10 @@ let pp ppf schema =
             "@,@[<hv 2>#%s:@ %a@]"
             id
             pp_element
-            {elt with id = None}
+            { elt with id = None }
       | Some pp_desc ->
           let stripped =
-            {elt with title = None; description = None; id = None}
+            { elt with title = None; description = None; id = None }
           in
           Format.fprintf
             ppf
@@ -523,19 +506,15 @@ let pp ppf schema =
             ()
             pp_element
             stripped)
-    schema.ids ;
+    schema.ids;
   Format.fprintf ppf "@]"
 
 (*-- errors ----------------------------------------------------------------*)
 
 exception Cannot_parse of path * exn
-
 exception Dangling_reference of Uri.t
-
 exception Bad_reference of string
-
 exception Unexpected of string * string
-
 exception Duplicate_definition of path * element * element
 
 let rec print_error ?print_unknown ppf = function
@@ -571,17 +550,16 @@ let rec print_error ?print_unknown ppf = function
 (*-- internal definition table handling ------------------------------------*)
 
 let find_definition name defs = List.assoc name defs
-
 let definition_exists name defs = List.mem_assoc name defs
 
 let insert_definition name elt defs =
   let rec insert = function
-    | [] -> [(name, elt)]
+    | [] -> [ (name, elt) ]
     | ((defname, _) as def) :: rem when defname <> name -> def :: insert rem
-    | (_, {kind = Dummy}) :: rem -> (name, elt) :: rem
+    | (_, { kind = Dummy }) :: rem -> (name, elt) :: rem
     | (_, defelt) :: rem ->
         if not (eq_element elt defelt) then
-          raise (Duplicate_definition (name, elt, defelt)) ;
+          raise (Duplicate_definition (name, elt, defelt));
         (name, elt) :: rem
   in
   insert defs
@@ -597,17 +575,24 @@ module Make (Repr : Json_repr.Repr) = struct
     let obj l = Repr.repr (`O l) in
     let set_always f v rest = (f, Repr.repr v) :: rest in
     let set_if_some f v cb rest =
-      match v with None -> rest | Some v -> (f, Repr.repr (cb v)) :: rest
+      match v with
+      | None -> rest
+      | Some v -> (f, Repr.repr (cb v)) :: rest
     in
     let set_if_cons f v cb rest =
-      match v with [] -> rest | v -> (f, Repr.repr (cb v)) :: rest
+      match v with
+      | [] -> rest
+      | v -> (f, Repr.repr (cb v)) :: rest
     in
     let set_if_neq f v v' cb rest =
-      if v <> v' then (f, Repr.repr (cb v)) :: rest else rest
+      if v <> v' then
+        (f, Repr.repr (cb v)) :: rest
+      else
+        rest
     in
     let set_multiple xs rest = List.rev_append xs rest in
     (* recursive encoder *)
-    let rec format_element {title; description; default; enum; kind; format} =
+    let rec format_element { title; description; default; enum; kind; format } =
       set_if_some "title" title (fun s -> `String s)
       @@ set_if_some "description" description (fun s -> `String s)
       @@ (fun rest ->
@@ -616,7 +601,10 @@ module Make (Repr : Json_repr.Repr) = struct
                let required =
                  List.fold_left
                    (fun r (n, _, p, _) ->
-                     if p then Repr.repr (`String n) :: r else r)
+                     if p then
+                       Repr.repr (`String n) :: r
+                     else
+                       r)
                    []
                    specs.properties
                in
@@ -688,7 +676,7 @@ module Make (Repr : Json_repr.Repr) = struct
                       | None -> `Bool false
                       | Some elt -> `O (format_element elt))
                @@ rest
-           | Monomorphic_array (elt, {min_items; max_items; unique_items}) ->
+           | Monomorphic_array (elt, { min_items; max_items; unique_items }) ->
                set_always "type" (`String "array")
                @@ set_always "items" (`O (format_element elt))
                @@ set_if_neq "minItems" min_items 0 (fun i -> `Float (float i))
@@ -719,21 +707,19 @@ module Make (Repr : Json_repr.Repr) = struct
                     (match specs.minimum with
                     | None -> []
                     | Some (v, `Inclusive) ->
-                        [("minimum", Repr.repr (`Float v))]
+                        [ ("minimum", Repr.repr (`Float v)) ]
                     | Some (v, `Exclusive) ->
-                        [
-                          ("exclusiveMinimum", Repr.repr (`Bool true));
-                          ("minimum", Repr.repr (`Float v));
+                        [ ("exclusiveMinimum", Repr.repr (`Bool true))
+                        ; ("minimum", Repr.repr (`Float v))
                         ])
                @@ set_multiple
                     (match specs.maximum with
                     | None -> []
                     | Some (v, `Inclusive) ->
-                        [("maximum", Repr.repr (`Float v))]
+                        [ ("maximum", Repr.repr (`Float v)) ]
                     | Some (v, `Exclusive) ->
-                        [
-                          ("exclusiveMaximum", Repr.repr (`Bool true));
-                          ("maximum", Repr.repr (`Float v));
+                        [ ("exclusiveMaximum", Repr.repr (`Bool true))
+                        ; ("maximum", Repr.repr (`Float v))
                         ])
                @@ rest
            | Number specs ->
@@ -743,24 +729,22 @@ module Make (Repr : Json_repr.Repr) = struct
                     (match specs.minimum with
                     | None -> []
                     | Some (v, `Inclusive) ->
-                        [("minimum", Repr.repr (`Float v))]
+                        [ ("minimum", Repr.repr (`Float v)) ]
                     | Some (v, `Exclusive) ->
-                        [
-                          ("exclusiveMinimum", Repr.repr (`Bool true));
-                          ("minimum", Repr.repr (`Float v));
+                        [ ("exclusiveMinimum", Repr.repr (`Bool true))
+                        ; ("minimum", Repr.repr (`Float v))
                         ])
                @@ set_multiple
                     (match specs.maximum with
                     | None -> []
                     | Some (v, `Inclusive) ->
-                        [("maximum", Repr.repr (`Float v))]
+                        [ ("maximum", Repr.repr (`Float v)) ]
                     | Some (v, `Exclusive) ->
-                        [
-                          ("exclusiveMaximum", Repr.repr (`Bool true));
-                          ("maximum", Repr.repr (`Float v));
+                        [ ("exclusiveMaximum", Repr.repr (`Bool true))
+                        ; ("maximum", Repr.repr (`Float v))
                         ])
                @@ rest
-           | String {pattern; min_length; max_length; str_format} ->
+           | String { pattern; min_length; max_length; str_format } ->
                set_always "type" (`String "string")
                @@ set_if_neq "minLength" min_length 0 (fun i ->
                       `Float (float i))
@@ -806,21 +790,24 @@ module Make (Repr : Json_repr.Repr) = struct
     | Cannot_parse (l, err) -> Cannot_parse (List.append p l, err)
     | exn -> exn
 
-  let at_field n = at_path [`Field n]
+  let at_field n = at_path [ `Field n ]
+  let at_index i = at_path [ `Index i ]
 
-  let at_index i = at_path [`Index i]
-
-  let of_json ?(validate_refs=true) ?(definitions_path = "/definitions/") json =
+  let of_json ?(validate_refs = true) ?(definitions_path = "/definitions/") json
+      =
     (* parser combinators *)
     let opt_field obj n =
       match Repr.view obj with
-      | `O ls -> ( try Some (List.assoc n ls) with Not_found -> None)
+      | `O ls -> (
+          try Some (List.assoc n ls) with
+          | Not_found -> None)
       | _ -> None
     in
     let opt_field_view obj n =
       match Repr.view obj with
       | `O ls -> (
-          try Some (Repr.view (List.assoc n ls)) with Not_found -> None)
+          try Some (Repr.view (List.assoc n ls)) with
+          | Not_found -> None)
       | _ -> None
     in
     let opt_string_field obj n =
@@ -865,12 +852,11 @@ module Make (Repr : Json_repr.Repr) = struct
     let opt_uri_field obj n =
       match opt_string_field obj n with
       | None -> None
-      | Some uri -> (
-          match Uri.canonicalize (Uri.of_string uri) with
-          | exception _ ->
-              raise
-                (Cannot_parse ([], Bad_reference (uri ^ " is not a valid URI")))
-          | uri -> Some uri)
+      | Some uri ->
+      match Uri.canonicalize (Uri.of_string uri) with
+      | exception _ ->
+          raise (Cannot_parse ([], Bad_reference (uri ^ " is not a valid URI")))
+      | uri -> Some uri
     in
     (* local resolution of definitions *)
     let schema_source =
@@ -891,31 +877,33 @@ module Make (Repr : Json_repr.Repr) = struct
             (Cannot_parse
                ([], Bad_reference (Uri.to_string uri ^ " has no fragment")))
       | None, Some fragment when not (String.contains fragment '/') ->
-          collected_id_refs := fragment :: !collected_id_refs ;
+          collected_id_refs := fragment :: !collected_id_refs;
           Id_ref fragment
       | None, Some fragment -> (
           let path =
-            try path_of_json_pointer ~wildcards:false fragment
-            with err -> raise (Cannot_parse ([], err))
+            try path_of_json_pointer ~wildcards:false fragment with
+            | err -> raise (Cannot_parse ([], err))
           in
           if not validate_refs then
             Def_ref path
           else
-          try
-            let raw = query path json in
-            if not (definition_exists path !collected_definitions) then (
-              (* dummy insertion so we don't recurse and we support cycles *)
-              collected_definitions :=
-                insert_definition path (element Dummy) !collected_definitions ;
-              let elt =
-                try parse_element schema_source raw
-                with err -> raise (at_path path err)
-              in
-              (* actual insertion *)
-              collected_definitions :=
-                insert_definition path elt !collected_definitions) ;
-            Def_ref path
-          with Not_found -> raise (Cannot_parse ([], Dangling_reference uri)))
+            try
+              let raw = query path json in
+              if not (definition_exists path !collected_definitions) then (
+                (* dummy insertion so we don't recurse and we support cycles *)
+                collected_definitions :=
+                  insert_definition path (element Dummy) !collected_definitions;
+                let elt =
+                  try parse_element schema_source raw with
+                  | err -> raise (at_path path err)
+                in
+                (* actual insertion *)
+                collected_definitions :=
+                  insert_definition path elt !collected_definitions
+              );
+              Def_ref path
+            with
+            | Not_found -> raise (Cannot_parse ([], Dangling_reference uri)))
     (* recursive parser *)
     and parse_element : Uri.t -> Repr.value -> element =
      fun source json ->
@@ -981,7 +969,7 @@ module Make (Repr : Json_repr.Repr) = struct
         let as_nary name combinator others =
           let build = function
             | [] -> None (* not found and no auxiliary case *)
-            | [case] -> Some case (* one case -> simplify *)
+            | [ case ] -> Some case (* one case -> simplify *)
             | cases ->
                 (* several cases build the combination node with empty options *)
                 let kind = Combine (combinator, cases) in
@@ -993,8 +981,8 @@ module Make (Repr : Json_repr.Repr) = struct
                 let rec items i acc = function
                   | elt :: tl ->
                       let elt =
-                        try parse_element source elt
-                        with err -> raise (at_field name @@ at_index i @@ err)
+                        try parse_element source elt with
+                        | err -> raise (at_field name @@ at_index i @@ err)
                       in
                       items (succ i) (elt :: acc) tl
                   | [] -> List.rev acc
@@ -1012,10 +1000,10 @@ module Make (Repr : Json_repr.Repr) = struct
           | None -> None
           | Some elt ->
               let elt =
-                try parse_element source (Repr.repr elt)
-                with err -> raise (at_field "not" err)
+                try parse_element source (Repr.repr elt) with
+                | err -> raise (at_field "not" err)
               in
-              let kind = Combine (Not, [elt]) in
+              let kind = Combine (Not, [ elt ]) in
               Some (element kind)
         in
         (* parse optional fields *)
@@ -1037,17 +1025,21 @@ module Make (Repr : Json_repr.Repr) = struct
         let as_one_of = as_nary "oneOf" One_of [] in
         let as_any_of = as_nary "anyOf" Any_of [] in
         let cases =
-          let ( @? ) o xs = match o with None -> xs | Some x -> x :: xs in
+          let ( @? ) o xs =
+            match o with
+            | None -> xs
+            | Some x -> x :: xs
+          in
           (* Note: building this reversed so we can use [rev_append] *)
           as_any_of @? as_one_of @? as_not @? as_ref @? as_kind @? []
         in
         let kind =
           match as_nary "allOf" All_of cases with
           | None -> Any (* no type, ref or logical combination found *)
-          | Some {kind} -> kind
+          | Some { kind } -> kind
         in
         (* add optional fields *)
-        {title; description; default; format; kind; enum; id}
+        { title; description; default; format; kind; enum; id }
     and parse_element_kind source json name =
       let integer_specs json =
         let multiple_of = opt_int_field json "multipleOf" in
@@ -1079,7 +1071,7 @@ module Make (Repr : Json_repr.Repr) = struct
             | None -> None
             | Some v -> Some (v, `Exclusive)
         in
-        {multiple_of; minimum; maximum}
+        { multiple_of; minimum; maximum }
       in
       let numeric_specs json =
         let multiple_of = opt_float_field json "multipleOf" in
@@ -1111,7 +1103,7 @@ module Make (Repr : Json_repr.Repr) = struct
             | None -> None
             | Some v -> Some (v, `Exclusive)
         in
-        {multiple_of; minimum; maximum}
+        { multiple_of; minimum; maximum }
       in
       match name with
       | "integer" -> Integer (integer_specs json)
@@ -1124,8 +1116,12 @@ module Make (Repr : Json_repr.Repr) = struct
             let str_format = opt_string_field json "format" in
             let min_length = opt_length_field json "minLength" in
             let max_length = opt_length_field json "maxLength" in
-            let min_length = match min_length with None -> 0 | Some l -> l in
-            {pattern; min_length; max_length; str_format}
+            let min_length =
+              match min_length with
+              | None -> 0
+              | Some l -> l
+            in
+            { pattern; min_length; max_length; str_format }
           in
           String specs
       | "array" -> (
@@ -1133,27 +1129,30 @@ module Make (Repr : Json_repr.Repr) = struct
             let unique_items = opt_bool_field false json "uniqueItems" in
             let min_items = opt_length_field json "minItems" in
             let max_items = opt_length_field json "maxItems" in
-            let min_items = match min_items with None -> 0 | Some l -> l in
+            let min_items =
+              match min_items with
+              | None -> 0
+              | Some l -> l
+            in
             match opt_field_view json "additionalItems" with
             | Some (`Bool true) ->
-                {
-                  min_items;
-                  max_items;
-                  unique_items;
-                  additional_items = Some (element Any);
+                { min_items
+                ; max_items
+                ; unique_items
+                ; additional_items = Some (element Any)
                 }
-            | None | Some (`Bool false) ->
-                {min_items; max_items; unique_items; additional_items = None}
+            | None
+            | Some (`Bool false) ->
+                { min_items; max_items; unique_items; additional_items = None }
             | Some elt ->
                 let elt =
-                  try parse_element source (Repr.repr elt)
-                  with err -> raise (at_field "additionalItems" err)
+                  try parse_element source (Repr.repr elt) with
+                  | err -> raise (at_field "additionalItems" err)
                 in
-                {
-                  min_items;
-                  max_items;
-                  unique_items;
-                  additional_items = Some elt;
+                { min_items
+                ; max_items
+                ; unique_items
+                ; additional_items = Some elt
                 }
           in
           match opt_field_view json "items" with
@@ -1162,16 +1161,16 @@ module Make (Repr : Json_repr.Repr) = struct
                 | [] -> Array (List.rev acc, specs)
                 | elt :: tl ->
                     let elt =
-                      try parse_element source elt
-                      with err -> raise (at_field "items" @@ at_index i err)
+                      try parse_element source elt with
+                      | err -> raise (at_field "items" @@ at_index i err)
                     in
                     elements (succ i) (elt :: acc) tl
               in
               elements 0 [] elts
           | Some elt ->
               let elt =
-                try parse_element source (Repr.repr elt)
-                with err -> raise (at_field "items" err)
+                try parse_element source (Repr.repr elt) with
+                | err -> raise (at_field "items" err)
               in
               Monomorphic_array (elt, specs)
           | None -> Monomorphic_array (element Any, specs))
@@ -1185,8 +1184,9 @@ module Make (Repr : Json_repr.Repr) = struct
                   | [] -> List.rev acc
                   | k :: _ ->
                       raise
-                        (at_field "required" @@ at_index i
-                       @@ unexpected k "string")
+                        (at_field "required"
+                        @@ at_index i
+                        @@ unexpected k "string")
                 in
                 items 0 [] (List.map Repr.view l)
           in
@@ -1197,9 +1197,9 @@ module Make (Repr : Json_repr.Repr) = struct
                   | [] -> List.rev acc
                   | (n, elt) :: tl ->
                       let elt =
-                        try parse_element source elt
-                        with err ->
-                          raise (at_field "properties" @@ at_field n @@ err)
+                        try parse_element source elt with
+                        | err ->
+                            raise (at_field "properties" @@ at_field n @@ err)
                       in
                       let req = List.mem n required in
                       items ((n, elt, req, None) :: acc) tl
@@ -1209,14 +1209,17 @@ module Make (Repr : Json_repr.Repr) = struct
             | None -> []
             | Some k -> raise (at_field "properties" @@ unexpected k "object")
           in
+          let nullable = opt_bool_field false json "nullable" in
           let additional_properties =
             match opt_field_view json "additionalProperties" with
             | Some (`Bool false) -> None
-            | None | Some (`Bool true) -> Some (element Any)
+            | None
+            | Some (`Bool true) ->
+                Some (element Any)
             | Some elt ->
                 let elt =
-                  try parse_element source (Repr.repr elt)
-                  with err -> raise (at_field "additionalProperties" err)
+                  try parse_element source (Repr.repr elt) with
+                  | err -> raise (at_field "additionalProperties" err)
                 in
                 Some elt
           in
@@ -1232,7 +1235,8 @@ module Make (Repr : Json_repr.Repr) = struct
                         | k :: _ ->
                             raise
                               (at_field "propertyDependencies"
-                              @@ at_field n @@ at_index j
+                              @@ at_field n
+                              @@ at_index j
                               @@ unexpected k "string")
                       in
                       strings 0 [] (List.map Repr.view l)
@@ -1255,8 +1259,8 @@ module Make (Repr : Json_repr.Repr) = struct
                   | [] -> List.rev acc
                   | (n, elt) :: tl ->
                       let elt =
-                        try parse_element source elt
-                        with err -> raise (at_field field @@ at_field n err)
+                        try parse_element source elt with
+                        | err -> raise (at_field field @@ at_field n err)
                       in
                       items ((n, elt) :: acc) tl
                 in
@@ -1272,21 +1276,21 @@ module Make (Repr : Json_repr.Repr) = struct
           in
           let max_properties = opt_length_field json "maxProperties" in
           Object
-            {
-              properties;
-              pattern_properties;
-              additional_properties;
-              min_properties;
-              max_properties;
-              schema_dependencies;
-              property_dependencies;
+            { properties
+            ; nullable
+            ; pattern_properties
+            ; additional_properties
+            ; min_properties
+            ; max_properties
+            ; schema_dependencies
+            ; property_dependencies
             }
       | n -> raise (Cannot_parse ([], Unexpected (n, "a known type")))
     in
     (* parse recursively from the root *)
     let root = parse_element Uri.empty json in
     (* force the addition of everything inside /definitions *)
-    (match Repr.view (query [`Field "definitions"] json) with
+    (match Repr.view (query [ `Field "definitions" ] json) with
     | `O all ->
         List.iter
           (fun (n, _) ->
@@ -1294,7 +1298,7 @@ module Make (Repr : Json_repr.Repr) = struct
             ignore (collect_definition uri))
           all
     | _ -> ()
-    | exception Not_found -> ()) ;
+    | exception Not_found -> ());
     (* check the domain of IDs *)
     List.iter
       (fun id ->
@@ -1302,12 +1306,12 @@ module Make (Repr : Json_repr.Repr) = struct
           raise
             (Cannot_parse
                ([], Dangling_reference Uri.(with_fragment empty (Some id)))))
-      !collected_id_refs ;
+      !collected_id_refs;
     let ids = !collected_id_defs in
     let source = schema_source in
     let world = [] in
     let definitions = !collected_definitions in
-    {root; definitions; source; ids; world}
+    { root; definitions; source; ids; world }
 
   (*-- creation and update ---------------------------------------------------*)
 
@@ -1315,102 +1319,124 @@ module Make (Repr : Json_repr.Repr) = struct
   let check_definitions root definitions =
     let collected_id_defs = ref [] in
     let collected_id_refs = ref [] in
-    let rec check ({kind; id} as elt) =
+    let rec check ({ kind; id } as elt) =
       (match id with
       | None -> ()
-      | Some id -> collected_id_defs := (id, elt) :: !collected_id_defs) ;
+      | Some id -> collected_id_defs := (id, elt) :: !collected_id_defs);
       match kind with
       | Object
-          {
-            properties;
-            pattern_properties;
-            additional_properties;
-            schema_dependencies;
+          { properties
+          ; pattern_properties
+          ; additional_properties
+          ; schema_dependencies
           } -> (
-          List.iter (fun (_, e, _, _) -> check e) properties ;
-          List.iter (fun (_, e) -> check e) pattern_properties ;
-          List.iter (fun (_, e) -> check e) schema_dependencies ;
-          match additional_properties with Some e -> check e | None -> ())
-      | Array (es, {additional_items}) -> (
-          List.iter check es ;
-          match additional_items with Some e -> check e | None -> ())
-      | Monomorphic_array (e, {additional_items}) -> (
-          check e ;
-          match additional_items with Some e -> check e | None -> ())
+          List.iter (fun (_, e, _, _) -> check e) properties;
+          List.iter (fun (_, e) -> check e) pattern_properties;
+          List.iter (fun (_, e) -> check e) schema_dependencies;
+          match additional_properties with
+          | Some e -> check e
+          | None -> ())
+      | Array (es, { additional_items }) -> (
+          List.iter check es;
+          match additional_items with
+          | Some e -> check e
+          | None -> ())
+      | Monomorphic_array (e, { additional_items }) -> (
+          check e;
+          match additional_items with
+          | Some e -> check e
+          | None -> ())
       | Combine (_, es) -> List.iter check es
       | Def_ref path ->
           if not (definition_exists path definitions) then
             let path = json_pointer_of_path path in
             raise (Dangling_reference (Uri.(with_fragment empty) (Some path)))
       | Id_ref id -> collected_id_refs := id :: !collected_id_refs
-      | Ext_ref _ | String _ | Integer _ | Number _ | Boolean | Null | Any
+      | Ext_ref _
+      | String _
+      | Integer _
+      | Number _
+      | Boolean
+      | Null
+      | Any
       | Dummy ->
           ()
     in
     (* check the root and definitions *)
-    check root ;
-    List.iter (fun (_, root) -> check root) definitions ;
+    check root;
+    List.iter (fun (_, root) -> check root) definitions;
     (* check the domain of IDs *)
     List.iter
       (fun id ->
         if not (List.mem_assoc id !collected_id_defs) then
           raise (Dangling_reference Uri.(with_fragment empty (Some id))))
-      !collected_id_refs ;
+      !collected_id_refs;
     !collected_id_defs
 
   let create root =
     let ids = check_definitions root [] in
-    {root; definitions = []; world = []; ids; source = Uri.empty}
+    { root; definitions = []; world = []; ids; source = Uri.empty }
 
-  let root {root} = root
+  let root { root } = root
 
   let update root sch =
     let ids = check_definitions root sch.definitions in
-    {sch with root; ids}
+    { sch with root; ids }
 
   let any = create (element Any)
 
   let self =
-    {
-      root = element (Ext_ref (Uri.of_string version));
-      definitions = [];
-      ids = [];
-      world = [];
-      source = Uri.empty;
+    { root = element (Ext_ref (Uri.of_string version))
+    ; definitions = []
+    ; ids = []
+    ; world = []
+    ; source = Uri.empty
     }
 
   (* remove unused definitions from the schema *)
   let simplify schema =
     let res = ref [] (* collected definitions *) in
-    let rec collect {kind} =
+    let rec collect { kind } =
       match kind with
       | Object
-          {
-            properties;
-            pattern_properties;
-            additional_properties;
-            schema_dependencies;
+          { properties
+          ; pattern_properties
+          ; additional_properties
+          ; schema_dependencies
           } -> (
-          List.iter (fun (_, e, _, _) -> collect e) properties ;
-          List.iter (fun (_, e) -> collect e) pattern_properties ;
-          List.iter (fun (_, e) -> collect e) schema_dependencies ;
-          match additional_properties with Some e -> collect e | None -> ())
-      | Array (es, {additional_items}) -> (
-          List.iter collect es ;
-          match additional_items with Some e -> collect e | None -> ())
-      | Monomorphic_array (e, {additional_items}) -> (
-          collect e ;
-          match additional_items with Some e -> collect e | None -> ())
+          List.iter (fun (_, e, _, _) -> collect e) properties;
+          List.iter (fun (_, e) -> collect e) pattern_properties;
+          List.iter (fun (_, e) -> collect e) schema_dependencies;
+          match additional_properties with
+          | Some e -> collect e
+          | None -> ())
+      | Array (es, { additional_items }) -> (
+          List.iter collect es;
+          match additional_items with
+          | Some e -> collect e
+          | None -> ())
+      | Monomorphic_array (e, { additional_items }) -> (
+          collect e;
+          match additional_items with
+          | Some e -> collect e
+          | None -> ())
       | Combine (_, es) -> List.iter collect es
       | Def_ref path ->
           let def = find_definition path schema.definitions in
           res := insert_definition path def !res
-      | Ext_ref _ | Id_ref _ | String _ | Integer _ | Number _ | Boolean | Null
-      | Any | Dummy ->
+      | Ext_ref _
+      | Id_ref _
+      | String _
+      | Integer _
+      | Number _
+      | Boolean
+      | Null
+      | Any
+      | Dummy ->
           ()
     in
-    collect schema.root ;
-    {schema with definitions = !res}
+    collect schema.root;
+    { schema with definitions = !res }
 
   let definition_path_of_name ?(definitions_path = "/definitions/") name =
     path_of_json_pointer ~wildcards:false
@@ -1436,7 +1462,7 @@ module Make (Repr : Json_repr.Repr) = struct
     let path = definition_path_of_name ?definitions_path name in
     (* check inside def *)
     let definitions = insert_definition path elt schema.definitions in
-    ({schema with definitions}, element (Def_ref path))
+    ({ schema with definitions }, element (Def_ref path))
 
   let merge_definitions (sa, sb) =
     let rec sorted_merge = function
@@ -1444,14 +1470,16 @@ module Make (Repr : Json_repr.Repr) = struct
           if na = nb then
             if da.kind = Dummy || db.kind = Dummy || eq_element da db then
               (na, da) :: sorted_merge tl
-            else raise (Duplicate_definition (na, da, db))
-          else a :: sorted_merge (b :: tl)
-      | ([] | [_]) as rem -> rem
+            else
+              raise (Duplicate_definition (na, da, db))
+          else
+            a :: sorted_merge (b :: tl)
+      | ([] | [ _ ]) as rem -> rem
     in
     let definitions =
       sorted_merge (List.sort compare (sa.definitions @ sb.definitions))
     in
-    ({sa with definitions}, {sb with definitions})
+    ({ sa with definitions }, { sb with definitions })
 
   let combine op schemas =
     let rec combine sacc eacc = function
@@ -1462,47 +1490,56 @@ module Make (Repr : Json_repr.Repr) = struct
     in
     combine any [] schemas
 
-  let is_nullable {ids; definitions; root} =
-    let rec nullable {kind} =
+  let is_nullable { ids; definitions; root } =
+    let rec nullable { kind } =
       match kind with
-      | Null | Any -> true
-      | Object _ | Array _ | Monomorphic_array _ | Ext_ref _ | String _
-      | Integer _ | Number _ | Boolean ->
+      | Null
+      | Any ->
+          true
+      | Object _
+      | Array _
+      | Monomorphic_array _
+      | Ext_ref _
+      | String _
+      | Integer _
+      | Number _
+      | Boolean ->
           false
-      | Combine (Not, [elt]) -> not (nullable elt)
+      | Combine (Not, [ elt ]) -> not (nullable elt)
       | Combine (All_of, elts) -> List.for_all nullable elts
       | Combine ((Any_of | One_of), elts) -> List.exists nullable elts
       | Def_ref path -> nullable (List.assoc path definitions)
       | Id_ref id -> nullable (List.assoc id ids)
-      | Combine (Not, _) | Dummy -> assert false
+      | Combine (Not, _)
+      | Dummy ->
+          assert false
     in
     nullable root
 
   (*-- default specs ---------------------------------------------------------*)
 
   let array_specs =
-    {
-      min_items = 0;
-      max_items = None;
-      unique_items = false;
-      additional_items = None;
+    { min_items = 0
+    ; max_items = None
+    ; unique_items = false
+    ; additional_items = None
     }
 
   let object_specs =
-    {
-      properties = [];
-      pattern_properties = [];
-      additional_properties = Some (element Any);
-      min_properties = 0;
-      max_properties = None;
-      schema_dependencies = [];
-      property_dependencies = [];
+    { properties = []
+    ; nullable = false
+    ; pattern_properties = []
+    ; additional_properties = Some (element Any)
+    ; min_properties = 0
+    ; max_properties = None
+    ; schema_dependencies = []
+    ; property_dependencies = []
     }
 
   let string_specs =
-    {pattern = None; min_length = 0; max_length = None; str_format = None}
+    { pattern = None; min_length = 0; max_length = None; str_format = None }
 
-  let numeric_specs = {multiple_of = None; minimum = None; maximum = None}
+  let numeric_specs = { multiple_of = None; minimum = None; maximum = None }
 end
 
 include Make (Json_repr.Ezjsonm)

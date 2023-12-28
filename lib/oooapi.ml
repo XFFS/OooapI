@@ -72,7 +72,11 @@ module DataModule = struct
         | [] -> [%type: Yojson.Safe.t]
         | _ :: _ ->
             gather_declarations ~type_name:qualifier element;
-            AstExt.typ (AstExt.typ_constr qualifier)
+            let typ = AstExt.typ (AstExt.typ_constr qualifier) in
+            if o.nullable then
+              [%type: [%t typ] option]
+            else
+              typ
       and type_of_combine :
              qualifier:string
           -> Json_schema.combinator * Json_schema.element list
@@ -385,7 +389,7 @@ module EndpointsModule = struct
       let optional = not p.required in
       let default, to_string =
         match p.schema with
-        (* TODO should the be an error? Or is defaulting to string right? *)
+        (* TODO should this be an error? Or is defaulting to string right? *)
         | None -> (None, var)
         | Some s ->
             let to_string, typ =

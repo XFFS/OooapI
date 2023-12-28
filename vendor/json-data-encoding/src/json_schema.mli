@@ -26,22 +26,22 @@
 
 (** {2 Abstract representation of schemas} *) (******************************)
 
-(** A JSON schema root. *)
 type schema
+(** A JSON schema root. *)
 
+and element =
+  { title : string option  (** An optional short description. *)
+  ; description : string option  (** An optional long description. *)
+  ; default : Json_repr.any option
+        (** A default constant to be substituted in case of a missing value. *)
+  ; enum : Json_repr.any list option
+        (** A valid value must equal one of these constants. *)
+  ; kind : element_kind  (** The type-specific part. *)
+  ; format : string option
+        (** predefined formats such as [date-time], [email], [ipv4], [ipv6], [uri]. *)
+  ; id : string option  (** An optional ID. *)
+  }
 (** A node in the schema, embeds all type-agnostic specs. *)
-and element = {
-  title : string option;  (** An optional short description. *)
-  description : string option;  (** An optional long description. *)
-  default : Json_repr.any option;
-      (** A default constant to be substituted in case of a missing value. *)
-  enum : Json_repr.any list option;
-      (** A valid value must equal one of these constants. *)
-  kind : element_kind;  (** The type-specific part. *)
-  format : string option;
-      (** predefined formats such as [date-time], [email], [ipv4], [ipv6], [uri]. *)
-  id : string option;  (** An optional ID. *)
-}
 
 (** The type-specific part of schema nodes. *)
 and element_kind =
@@ -76,95 +76,99 @@ and combinator =
   | All_of  (** Logical AND n-ary combinator. *)
   | Not  (** Logical NOT unary combinator. *)
 
+and array_specs =
+  { min_items : int  (** The minimum number of elements. *)
+  ; max_items : int option  (** The maximum number of elements. *)
+  ; unique_items : bool  (** Teels if all elements must be different. *)
+  ; additional_items : element option
+        (** The type of additional items, if allowed. *)
+  }
 (** Parameters of the [Array] and [MonomorphicArray] type specifiers. *)
-and array_specs = {
-  min_items : int;  (** The minimum number of elements. *)
-  max_items : int option;  (** The maximum number of elements. *)
-  unique_items : bool;  (** Teels if all elements must be different. *)
-  additional_items : element option;
-      (** The type of additional items, if allowed. *)
-}
 
+and numeric_specs =
+  { multiple_of : float option  (** An optional divisor of valid values *)
+  ; minimum : (float * [ `Inclusive | `Exclusive ]) option
+        (** The optional lower bound of the numeric range *)
+  ; maximum : (float * [ `Inclusive | `Exclusive ]) option
+        (** The optional upper bound of the numeric range *)
+  }
 (** Parameters of the [Integer] and [Number] type specifiers. *)
-and numeric_specs = {
-  multiple_of : float option;  (** An optional divisor of valid values *)
-  minimum : (float * [`Inclusive | `Exclusive]) option;
-      (** The optional lower bound of the numeric range *)
-  maximum : (float * [`Inclusive | `Exclusive]) option;
-      (** The optional upper bound of the numeric range *)
-}
 
-(** Parameters of the [Object] type specifier. *)
-and object_specs = {
-  properties : (string * element * bool * Json_repr.any option) list;
-      (** The names and types of properties, with a flag to indicate if
+and object_specs =
+  { properties : (string * element * bool * Json_repr.any option) list
+        (** The names and types of properties, with a flag to indicate if
         they are required ([true]) or optional. *)
-  pattern_properties : (string * element) list;
-      (** Alternative definition of properties, matching field names
+  ; nullable : bool
+        (** Allows sending a null value for the defined schema. Default value is false. *)
+  ; pattern_properties : (string * element) list
+        (** Alternative definition of properties, matching field names
         using regexps instead of constant strings. *)
-  additional_properties : element option;
-      (** The type of additional properties, if allowed. *)
-  min_properties : int;  (** The minimum number of properties. *)
-  max_properties : int option;  (** The maximum number of properties. *)
-  schema_dependencies : (string * element) list;
-      (** Additional schemas the value must verify if a property is
+  ; additional_properties : element option
+        (** The type of additional properties, if allowed. *)
+  ; min_properties : int  (** The minimum number of properties. *)
+  ; max_properties : int option  (** The maximum number of properties. *)
+  ; schema_dependencies : (string * element) list
+        (** Additional schemas the value must verify if a property is
         present (property, additional schema). *)
-  property_dependencies : (string * string list) list;
-      (** Additional properties required whenever some property is
+  ; property_dependencies : (string * string list) list
+        (** Additional properties required whenever some property is
         present (property, additional properties). *)
-}
+  }
+(** Parameters of the [Object] type specifier. *)
 
+and string_specs =
+  { pattern : string option  (** A regexp the string must conform to. *)
+  ; min_length : int  (** The minimum string length. *)
+  ; max_length : int option  (** The maximum string length. *)
+  ; str_format : string option
+        (** Special format of the string (cf {{:https://json-schema.org/understanding-json-schema/reference/string.html#format} json schema documentation}). *)
+  }
 (** Parameters of the [String] type specifier. *)
-and string_specs = {
-  pattern : string option;  (** A regexp the string must conform to. *)
-  min_length : int;  (** The minimum string length. *)
-  max_length : int option;  (** The maximum string length. *)
-  str_format : string option;
-      (** Special format of the string (cf {{:https://json-schema.org/understanding-json-schema/reference/string.html#format} json schema documentation}). *)
-}
 
 (** {2 Combinators to build schemas and elements} *)
 
 (*************************)
 
-(** Construct a naked element (all optional properties to None). *)
 val element : element_kind -> element
+(** Construct a naked element (all optional properties to None). *)
 
+val create : element -> schema
 (** Construct a schema from its root, without any definition ; the
     element is checked not to contain any [Def] element. *)
-val create : element -> schema
 
-(** Extract the root element from an existing schema. *)
 val root : schema -> element
+(** Extract the root element from an existing schema. *)
 
+val update : element -> schema -> schema
 (** Update a schema from its root, using the definitions from an
     existing schema ; the element is checked to contain only valid
     [Def] elements ; unused definitions are kept, see {!simplify}. *)
-val update : element -> schema -> schema
 
-(** Describes the implemented schema specification as a schema. *)
 val self : schema
+(** Describes the implemented schema specification as a schema. *)
 
-(** A completely generic schema, without any definition. *)
 val any : schema
+(** A completely generic schema, without any definition. *)
 
-(** Combines several schemas. *)
 val combine : combinator -> schema list -> schema
+(** Combines several schemas. *)
 
-(** Tells is a schema accepts null. *)
 val is_nullable : schema -> bool
+(** Tells is a schema accepts null. *)
 
 (** {2 Named definitions} *) (***********************************************)
 
+val merge_definitions : schema * schema -> schema * schema
 (** Merges the definitions of two schemas if possible and returns the
     updated schemas, so that their elements can be mixed without
     introducing dangling references ; if two different definitions are
     bound to the same path, {!Duplicate_definition} will be raised. *)
-val merge_definitions : schema * schema -> schema * schema
 
-(** Remove the definitions that are not present in the schema. *)
 val simplify : schema -> schema
+(** Remove the definitions that are not present in the schema. *)
 
+val add_definition :
+  ?definitions_path:string -> string -> element -> schema -> schema * element
 (** Adds a definition by its path. If the path is absolute (starting
     with a ['/']), it is untouched. Otherwise, it is considered
     relative to ["#/definitions"] as recommended by the standard. May
@@ -172,86 +176,86 @@ val simplify : schema -> schema
     error raised by {!Json_repr.path_of_json_pointer} with
     [~wildcards:false]. Returns the modified schema and the [Def_ref]
     node that references this definition to be used in the schema. *)
-val add_definition :
-  ?definitions_path:string -> string -> element -> schema -> schema * element
 
+val find_definition : ?definitions_path:string -> string -> schema -> element
 (** Finds a definition by its path, may raise [Not_found].
     See {!add_definition} for the name format.*)
-val find_definition : ?definitions_path:string -> string -> schema -> element
 
+val definition_exists : ?definitions_path:string -> string -> schema -> bool
 (** Tells if a path leads to a definition.
     See {!add_definition} for the name format. *)
-val definition_exists : ?definitions_path:string -> string -> schema -> bool
 
+val definition_ref : ?definitions_path:string -> string -> element
 (** Build a reference to a definition.
     See {!add_definition} for the name format. *)
-val definition_ref : ?definitions_path:string -> string -> element
 
 (** {2 Predefined values} *) (***********************************************)
 
-(** Default Parameters of the [Array] and [MonomorphicArray] type specifiers. *)
 val array_specs : array_specs
+(** Default Parameters of the [Array] and [MonomorphicArray] type specifiers. *)
 
-(** Default parameters of the [Object] type specifier. *)
 val object_specs : object_specs
+(** Default parameters of the [Object] type specifier. *)
 
-(** Default parameters of the [String] type specifier. *)
 val string_specs : string_specs
+(** Default parameters of the [String] type specifier. *)
 
-(** Default parameters of the [Integer] and [Number] type specifiers. *)
 val numeric_specs : numeric_specs
+(** Default parameters of the [Integer] and [Number] type specifiers. *)
 
 (** {2 JSON Serialization} *) (*********************************************)
 
+val to_json : schema -> Json_repr.ezjsonm
 (** Formats a JSON schema as its JSON representation.
 
     This function works with JSON data represented in the {!Json_repr.ezjsonm}
     format. See functor {!Make} for using another representation. *)
-val to_json : schema -> Json_repr.ezjsonm
 
+val of_json :
+  ?validate_refs:bool -> ?definitions_path:string -> Json_repr.ezjsonm -> schema
 (** Parse a JSON structure as a JSON schema, if possible.
     May throw {!Cannot_parse}.
 
     This function works with JSON data represented in the {!Json_repr.ezjsonm}
     format. See functor {!Make} for using another representation. *)
-val of_json : ?validate_refs:bool -> ?definitions_path:string -> Json_repr.ezjsonm -> schema
 
-(** Formats a JSON schema in human readable format. *)
 val pp : Format.formatter -> schema -> unit
+(** Formats a JSON schema in human readable format. *)
 
 (** {2 Errors} *) (**********************************************************)
 
+exception Cannot_parse of Json_query.path * exn
 (** An error happened during parsing.
     May box one of the following exceptions, among others.. *)
-exception Cannot_parse of Json_query.path * exn
 
-(** A reference to a non-existent location was detected. *)
 exception Dangling_reference of Uri.t
+(** A reference to a non-existent location was detected. *)
 
-(** A reference litteral could not be understood. *)
 exception Bad_reference of string
+(** A reference litteral could not be understood. *)
 
-(** An unexpected kind of JSON value was encountered. *)
 exception Unexpected of string * string
+(** An unexpected kind of JSON value was encountered. *)
 
-(** A non-[Dummy] definition appeared twice on insertion or merge. *)
 exception Duplicate_definition of Json_query.path * element * element
+(** A non-[Dummy] definition appeared twice on insertion or merge. *)
 
-(** Produces a human readable version of an error. *)
 val print_error :
-  ?print_unknown:(Format.formatter -> exn -> unit) ->
-  Format.formatter ->
-  exn ->
-  unit
+     ?print_unknown:(Format.formatter -> exn -> unit)
+  -> Format.formatter
+  -> exn
+  -> unit
+(** Produces a human readable version of an error. *)
 
 (** {2 Advanced interface for using a custom JSON representation} *)
 
 (**********)
 
 module Make (Repr : Json_repr.Repr) : sig
-  (** Same as {!to_json} for a custom JSON representation. *)
   val to_json : schema -> Repr.value
+  (** Same as {!to_json} for a custom JSON representation. *)
 
+  val of_json :
+    ?validate_refs:bool -> ?definitions_path:string -> Repr.value -> schema
   (** Same as {!of_json} for a custom JSON representation. *)
-  val of_json : ?validate_refs:bool -> ?definitions_path:string -> Repr.value -> schema
 end

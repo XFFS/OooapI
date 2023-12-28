@@ -13,7 +13,7 @@ let main =
     let* () = Lwt_io.printl "" in
     match res with
     | Ok data ->
-        let* () = Lwt_io.printl "list_models: Ok!" in
+        let* () = Lwt_io.printl "list_models: OK" in
         Lwt_list.iter_s
           (fun s -> Yojson.Safe.to_string s |> Lwt_io.printl)
           data.data
@@ -29,12 +29,13 @@ let main =
     let* res =
       let data =
         Data.CreateCompletionRequest.(
-          make ~model:"text-davinci-003" ~prompt:"You complete me" ())
+          make ~model:"davinci-002" ~prompt:"You complete me" ())
       in
       Api.create_completion data
     in
     match res with
     | Ok data ->
+        let* () = Lwt_io.printl "create_completion: OK" in
         data.choices
         |> Lwt_list.iter_s (fun c ->
                c.Data.CreateCompletionResponse.choices_item_text
