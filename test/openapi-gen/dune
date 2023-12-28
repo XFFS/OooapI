@@ -12,12 +12,16 @@
 
 (rule
  (target openai_api.ml)
- (deps %{bin:oooapi} openapi-openai.json)
+ (deps %{bin:oooapi}
+       (:openai openapi-openai.json))
  (action
-  (progn
-   (with-stdout-to openai_api.ml (run oooapi openapi-openai.json)))))
+  (with-stdout-to %{target}
+    (run oooapi %{openai}))))
 
 (executable
  (name test_openai)
  (modules test_openai)
  (libraries openai_api cohttp-lwt-unix))
+
+(cram
+ (deps ./test_openai.exe))

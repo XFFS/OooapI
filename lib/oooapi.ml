@@ -60,7 +60,7 @@ module DataModule = struct
         | Integer _ -> [%type: int]
         | Number _ -> [%type: float]
         | String _ -> [%type: string]
-        | Combine _ -> [%type: Yojson.Safe.t]
+        | Combine (comb, elems) -> type_of_combine ~qualifier (comb, elems)
         | Def_ref path ->
             AstExt.typ (AstExt.typ_constr (type_name_of_def_ref path))
         | Monomorphic_array (e, _) ->
@@ -73,7 +73,29 @@ module DataModule = struct
         | _ :: _ ->
             gather_declarations ~type_name:qualifier element;
             AstExt.typ (AstExt.typ_constr qualifier)
+      and type_of_combine :
+             qualifier:string
+          -> Json_schema.combinator * Json_schema.element list
+          -> core_type =
+       fun ~qualifier (comb, elems) ->
+        match comb with
+        | Json_schema.All_of
+        | Json_schema.Not ->
+            [%type: Yojson.Safe.t]
+        | Json_schema.Any_of
+        | Json_schema.One_of ->
+        match
+          elems
+          |> List.find_opt (function
+                 | Json_schema.{ kind = String _; _ } -> true
+                 | _ -> false)
+        with
+        (* If it can be a string, let it be a string *)
+        | Some s -> type_of_element ~qualifier s
+        (* Otherwise let it be the first thing it could be *)
+        | _ -> type_of_element ~qualifier (List.hd elems)
       in
+
       let type_decl_of_object :
           name:string -> Json_schema.object_specs -> type_declaration =
         let record_label :
@@ -275,48 +297,64 @@ module EndpointsModule = struct
     let empty = { query = []; path = []; header = []; form = [] }
     let to_list { query; path; header; form } = query @ path @ header @ form
 
+    let rec string_conv_and_format_of_elem_kind :
+        Json_schema.element_kind -> expression * string option = function
+      (* Unsupported schemas *)
+      | Id_ref _ ->
+          raise
+            (Invalid_argument "param_of_json_schema_element given id_ref schema")
+      | Ext_ref _ ->
+          raise
+            (Invalid_argument
+               "param_of_json_schema_element given ext_ref schema")
+      | Dummy ->
+          raise
+            (Invalid_argument "param_of_json_schema_element given dummy schema")
+      | Array (_, _) ->
+          raise
+            (Invalid_argument "param_of_json_schema_element given het-array")
+      | Object _ ->
+          raise (Invalid_argument "param_of_json_schema_element given object")
+      | Def_ref _ ->
+          raise (Invalid_argument "param_of_json_schema_element given def-ref")
+      | Monomorphic_array (_, _) ->
+          raise (Invalid_argument "param_of_json_schema_element given array")
+      (* Supported schemas *)
+      | Any -> raise (Invalid_argument "param_of_json_schema_element given any")
+      | Null -> ([%expr fun _ -> "null"], None)
+      | Boolean -> ([%expr string_of_bool], None)
+      | Integer _ -> ([%expr string_of_int], None)
+      | Number _ -> ([%expr string_of_float], None)
+      | String s -> ([%expr fun x -> x], s.str_format)
+      | Combine (_, []) ->
+          raise
+            (Invalid_argument
+               "param_of_json_schema_element given combine with empty types")
+      | Combine (Json_schema.All_of, _) ->
+          raise
+            (Invalid_argument
+               "param_of_json_schema_element given combine all_of")
+      | Combine (Json_schema.Not, _) ->
+          raise
+            (Invalid_argument "param_of_json_schema_element given combine not")
+      | Combine ((One_of | Any_of), elems) ->
+      (* If it can be a string, let it be a string *)
+      match
+        elems
+        |> List.find_opt (function
+               | Json_schema.{ kind = String _; _ } -> true
+               | _ -> false)
+      with
+      | Some s -> string_conv_and_format_of_elem_kind s.kind
+      (* Otherwise let it be the first thing it could be *)
+      | _ -> string_conv_and_format_of_elem_kind (List.hd elems).kind
+
     let param_of_element :
         name:string -> optional:bool -> Json_schema.element -> param =
      fun ~name ~optional elem ->
       let var = Ast.evar (AstExt.to_identifier name) in
       let pat = Ast.pvar (AstExt.to_identifier name) in
-      let to_string, format =
-        match (elem.kind : Json_schema.element_kind) with
-        (* Unsupported schemas *)
-        | Id_ref _ ->
-            raise
-              (Invalid_argument
-                 "param_of_json_schema_element given id_ref schema")
-        | Ext_ref _ ->
-            raise
-              (Invalid_argument
-                 "param_of_json_schema_element given ext_ref schema")
-        | Dummy ->
-            raise
-              (Invalid_argument
-                 "param_of_json_schema_element given dummy schema")
-        | Array (_, _) ->
-            raise
-              (Invalid_argument "param_of_json_schema_element given het-array")
-        | Object _ ->
-            raise (Invalid_argument "param_of_json_schema_element given object")
-        | Def_ref _ ->
-            raise
-              (Invalid_argument "param_of_json_schema_element given def-ref")
-        | Monomorphic_array (_, _) ->
-            raise (Invalid_argument "param_of_json_schema_element given array")
-        (* Supported schemas *)
-        | Any ->
-            raise (Invalid_argument "param_of_json_schema_element given any")
-        | Combine _ ->
-            raise
-              (Invalid_argument "param_of_json_schema_element given combine")
-        | Null -> ([%expr fun _ -> "null"], None)
-        | Boolean -> ([%expr string_of_bool], None)
-        | Integer _ -> ([%expr string_of_int], None)
-        | Number _ -> ([%expr string_of_float], None)
-        | String s -> ([%expr fun x -> x], s.str_format)
-      in
+      let to_string, format = string_conv_and_format_of_elem_kind elem.kind in
       let default =
         elem.default
         |> Option.map (Json_repr.any_to_repr (module Json_repr.Yojson))
@@ -611,7 +649,7 @@ module EndpointsModule = struct
    fun path operation ->
     let name = operation_function_name operation path in
     let params = Params.of_openapi_parameters operation.parameters in
-    let decode_resp= response_decoder operation in
+    let decode_resp = response_decoder operation in
     let body =
       [%expr
         make_request
