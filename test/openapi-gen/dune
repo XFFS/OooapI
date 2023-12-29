@@ -24,4 +24,7 @@
  (libraries openai_api cohttp-lwt-unix))
 
 (cram
- (deps ./test_openai.exe))
+ (deps ./test_openai.exe)
+ ;; we don't want to run this test in CI because it eats OpenAPI credits
+ (enabled_if %{env:OOOAPI_LOCAL_TEST=false})
+ )

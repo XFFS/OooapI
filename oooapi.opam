@@ -8,7 +8,7 @@ license: "MIT"
 homepage: "https://github.com/shonfeder/ooopai"
 bug-reports: "https://github.com/shonfeder/ooopai/issues"
 depends: [
-  "dune" {>= "2.9" & > "2.9"}
+  "dune" {>= "3.7" & > "2.9"}
   "openapi_spec"
   "ppxlib" {>= "0.28.0"}
   "camelsnakekebab" {>= "0.4"}
@@ -34,11 +34,9 @@ build: [
     name
     "-j"
     jobs
-    "--promote-install-files=false"
     "@install"
     "@runtest" {with-test}
     "@doc" {with-doc}
   ]
-  ["dune" "install" "-p" name "--create-install-files" name]
 ]
 dev-repo: "git+https://github.com/shonfeder/ooopai.git"
