@@ -1,0 +1,16 @@
+#+title: Contributing
+
+* Testing
+
+To test spec parsing and client generation, run
+
+#+begin_src sh
+dune test
+#+end_src
+
+To run the end to end tests against the OpenAI API
+
+#+begin_src sh
+export OPENAI_API_KEY=<your-api-key>
+export OOOAPI_LOCAL_TEST=true
+#+end_src
