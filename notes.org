@@ -1,0 +1,18 @@
+#+title: Notes
+
+* Constructing OCaml
+
+For constructing OCaml
+ https://ocaml-ppx.github.io/ppxlib/ppxlib/generating-code.html#metaquot
+* Notes
+
+** To convert an OpenAPI spec from yaml to json
+Using https://github.com/kislyuk/yq
+
+#+begin_src sh
+yq < ./thespec.yaml > ./thespec.json
+#+end_src
+
+* Tasks
+** TODO Automate conversion of yaml to json for specs, via yq
+** TODO Support url encoded forms
