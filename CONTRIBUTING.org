@@ -1,5 +1,18 @@
 #+title: Contributing
 
+* Code Organization
+
+OooapI aims to approach the problem of HTTP client generation thru principled
+metaprogramming. This in contrast to an approach for
+
+- [[./bin/][./bin]] :: The =oooapi= executable that generates ocaml code from an OpenAPI
+  spec.
+- ./[[./lib/][lib]]  :: The internal library used by the =oooapi= executable.
+- [[./openapi_spec][./openapi_spec]] :: A library implementing a (partial) representation of the
+  OpenAPI spec, via ATD specs.
+- [[./vendor][./vendor]]  :: Vendored libraries. Currently only including
+  =json-data-encoding=, which is used for its JSON spec support.
+
 * Testing
 
 To test spec parsing and client generation, run
