@@ -62,7 +62,7 @@ module DataModule = struct
         | String _ -> [%type: string]
         | Combine (comb, elems) -> type_of_combine ~qualifier (comb, elems)
         | Def_ref path ->
-            AstExt.typ (AstExt.typ_constr (type_name_of_def_ref path))
+            AstExt.Type.v (AstExt.Type.constr (type_name_of_def_ref path))
         | Monomorphic_array (e, _) ->
             let item_type_name = qualifier ^ "_item" in
             let item_type = type_of_element ~qualifier:item_type_name e in
@@ -72,7 +72,7 @@ module DataModule = struct
         | [] -> [%type: Yojson.Safe.t]
         | _ :: _ ->
             gather_declarations ~type_name:qualifier element;
-            let typ = AstExt.typ (AstExt.typ_constr qualifier) in
+            let typ = AstExt.Type.v (AstExt.Type.constr qualifier) in
             if o.nullable then
               [%type: [%t typ] option]
             else
@@ -154,12 +154,12 @@ module DataModule = struct
         fun ~name { properties; _ } ->
           match properties with
           | [] ->
-              AstExt.typ_decl
+              AstExt.Type.decl
                 type_name
                 ~manifest:[%type: Yojson.Safe.t]
                 ~attributes:(deriving_attrs ~is_record:false)
           | ps ->
-              AstExt.typ_decl
+              AstExt.Type.decl
                 type_name
                 ~kind:
                   (Ptype_record (List.map (record_label ~type_name:name) ps))
@@ -170,16 +170,16 @@ module DataModule = struct
         match (element.kind : Json_schema.element_kind) with
         | Combine (_, _)
         | Any ->
-            AstExt.typ_decl "t" ~attributes ~manifest:[%type: Yojson.Safe.t]
-        | Null -> AstExt.typ_decl "t" ~attributes ~manifest:[%type: unit]
-        | Boolean -> AstExt.typ_decl "t" ~attributes ~manifest:[%type: bool]
-        | String _ -> AstExt.typ_decl "t" ~attributes ~manifest:[%type: string]
-        | Integer _ -> AstExt.typ_decl "t" ~attributes ~manifest:[%type: int]
-        | Number _ -> AstExt.typ_decl "t" ~attributes ~manifest:[%type: float]
+            AstExt.Type.decl "t" ~attributes ~manifest:[%type: Yojson.Safe.t]
+        | Null -> AstExt.Type.decl "t" ~attributes ~manifest:[%type: unit]
+        | Boolean -> AstExt.Type.decl "t" ~attributes ~manifest:[%type: bool]
+        | String _ -> AstExt.Type.decl "t" ~attributes ~manifest:[%type: string]
+        | Integer _ -> AstExt.Type.decl "t" ~attributes ~manifest:[%type: int]
+        | Number _ -> AstExt.Type.decl "t" ~attributes ~manifest:[%type: float]
         | Object o -> type_decl_of_object ~name:type_name o
         | Monomorphic_array (elem, _) ->
             gather_declarations ~type_name:"item" elem;
-            AstExt.typ_decl "t" ~attributes ~manifest:[%type: item list]
+            AstExt.Type.decl "t" ~attributes ~manifest:[%type: item list]
         (* TODO: Support for one_of *)
         (* TODO: Error on unsupported types? Or better to leave placeholder..  *)
         | Def_ref _
@@ -187,7 +187,7 @@ module DataModule = struct
         | Ext_ref _
         | Array (_, _)
         | Dummy ->
-            AstExt.typ_decl
+            AstExt.Type.decl
               type_name
               ~kind:
                 (Ptype_variant

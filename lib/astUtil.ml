@@ -1,7 +1,12 @@
 open Ppxlib
 (** Utilities to ease the pain of ast construction a bit *)
 
-module OcamlBuiltins = struct
+module OcamlBuiltins : sig
+  val is_keyword : string -> bool
+
+  val sanitize : string -> string
+  (** [sanitize s] is [s ^ "_"] if [is_keyword s]. Otherwise, it is [s]. *)
+end = struct
   module StrSet = Set.Make (String)
 
   let keywords =
@@ -99,65 +104,59 @@ module AstExt = struct
     |> Camelsnakekebab.lower_snake_case
     |> OcamlBuiltins.sanitize
 
-  let typ ptyp_desc : core_type =
-    { ptyp_desc; ptyp_loc = loc; ptyp_loc_stack = []; ptyp_attributes = [] }
+  module Type = struct
+    (** Create a core type from a type description *)
+    let v ptyp_desc : core_type =
+      { ptyp_desc; ptyp_loc = loc; ptyp_loc_stack = []; ptyp_attributes = [] }
 
-  let typ_constr ?(args = []) name =
-    Ptyp_constr (n (Astlib.Longident.parse name), args)
+    (** A type constructor
 
-  let typ_decl
-      ?kind
-      ?manifest
-      ?(params = [])
-      ?(cstrs = [])
-      ?(private_ = false)
-      ?(attributes = [])
-      name : type_declaration =
-    let private_ =
-      if private_ then
-        Private
-      else
-        Public
-    in
-    let ptype_kind = Option.value kind ~default:Ptype_abstract in
-    { ptype_kind
-    ; ptype_name = n name
-    ; ptype_params = params
-    ; ptype_cstrs = cstrs
-    ; ptype_private = private_
-    ; ptype_manifest = manifest
-    ; ptype_attributes = attributes
-    ; ptype_loc = loc
-    }
+        E.g., [constr "Foo" [int, str]] makes the type constructor [(int, str) Foo] *)
+    let constr ?(args = []) name =
+      Ptyp_constr (n (Astlib.Longident.parse name), args)
 
-  let attr ~name = Ast.attribute ~name:(n name) ~payload:(PStr [])
+    (** A type declaration *)
+    let decl
+        ?kind
+        ?manifest
+        ?(params = [])
+        ?(cstrs = [])
+        ?(private_ = false)
+        ?(attributes = [])
+        name : type_declaration =
+      let private_ =
+        if private_ then
+          Private
+        else
+          Public
+      in
+      let ptype_kind = Option.value kind ~default:Ptype_abstract in
+      { ptype_kind
+      ; ptype_name = n name
+      ; ptype_params = params
+      ; ptype_cstrs = cstrs
+      ; ptype_private = private_
+      ; ptype_manifest = manifest
+      ; ptype_attributes = attributes
+      ; ptype_loc = loc
+      }
+  end
 
-  let const_str s : expression =
-    Ast.pexp_constant (Pconst_string (s, loc, None))
-
-  let attr_str ~name str =
-    Ast.attribute
-      ~name:(n name)
-      ~payload:(PStr [ Ast.pstr_eval (const_str str) [] ])
-
-  let attr_strs ~name strs =
-    Ast.attribute
-      ~name:(n name)
-      ~payload:
-        (PStr [ Ast.pstr_eval (Ast.pexp_tuple (List.map const_str strs)) [] ])
-
-  let attr_ident ~name ident =
-    let ident = Astlib.Longident.parse ident in
-    Ast.attribute
-      ~name:(n name)
-      ~payload:(PStr [ Ast.pstr_eval (Ast.pexp_ident (n ident)) [] ])
-
-  (* A variable pattern *)
   module Pat = struct
+    (** Patterns *)
+
+    (** A variable pattern *)
     let var v = Ast.ppat_var (n v)
   end
 
   module Exp = struct
+    (** Expressions *)
+
+    (** A string constant *)
+    let const_str s : expression =
+      Ast.pexp_constant (Pconst_string (s, loc, None))
+
+    (** A function *)
     let f ?label ?(optional = false) ?default pat exp =
       let label =
         Option.(
@@ -171,6 +170,7 @@ module AstExt = struct
       in
       Ast.pexp_fun label default pat exp
 
+    (*** Let bindings *)
     let lets ?(rec_ = false) bindings expr =
       let rec_flag =
         if rec_ then
@@ -185,4 +185,24 @@ module AstExt = struct
       | [] -> expr
       | bindings -> Ast.pexp_let rec_flag bindings expr
   end
+
+  let attr ~name = Ast.attribute ~name:(n name) ~payload:(PStr [])
+
+  let attr_str ~name str =
+    Ast.attribute
+      ~name:(n name)
+      ~payload:(PStr [ Ast.pstr_eval (Exp.const_str str) [] ])
+
+  let attr_strs ~name strs =
+    Ast.attribute
+      ~name:(n name)
+      ~payload:
+        (PStr
+           [ Ast.pstr_eval (Ast.pexp_tuple (List.map Exp.const_str strs)) [] ])
+
+  let attr_ident ~name ident =
+    let ident = Astlib.Longident.parse ident in
+    Ast.attribute
+      ~name:(n name)
+      ~payload:(PStr [ Ast.pstr_eval (Ast.pexp_ident (n ident)) [] ])
 end
