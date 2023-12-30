@@ -10,8 +10,6 @@ bug-reports: "https://github.com/shonfeder/ooopai/issues"
 depends: [
   "dune" {>= "3.7" & > "2.9"}
   "atdgen" {>= "2.11.0"}
-  "ppxlib" {>= "0.28.0"}
-  "camelsnakekebab" {>= "0.4"}
   "ppx_expect" {with-test & >= "v0.15.1"}
   "tezt" {with-test}
   "odoc" {with-doc}

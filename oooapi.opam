@@ -15,10 +15,10 @@ depends: [
   "multipart_form" {>= "0.5.0"}
   "multipart_form-lwt" {>= "0.5.0"}
   "multipart_form-cohttp-lwt" {>= "0.5.0"}
-  "uuidm"
-  "cohttp-lwt-unix"
-  "tls"
-  "tls-lwt"
+  "uuidm" {>= "0.9.8"}
+  "cohttp-lwt-unix" {>= "5.2.0"}
+  "tls" {>= "0.17.0"}
+  "tls-lwt" {>= "0.17.0"}
   "ppx_deriving_yojson" {with-test}
   "ppx_deriving" {with-test}
   "ppx_expect" {with-test & >= "v0.15.1"}
