@@ -1,6 +1,16 @@
 #+title: OooapI: OCaml of OpenAPI
 
-OooapI ("ooo-ah-pea") is OCaml of and for OpenAPI specs. It currently supports:
+*tl;dr*: OooapI implements a solution to this problem:
+
+#+begin_src
+spec:'OpenAPI spec' -> 'OCaml client library for'(spec)
+#+end_src
+
+* Overview
+
+OooapI[fn:1] is OCaml of (and for) OpenAPI specs.
+
+OooapI currently supports:
 
 - Generating OCaml clients for a (a substantial) fragment of the OpenAPI
   specification schema.
@@ -9,4 +19,45 @@ OooapI ("ooo-ah-pea") is OCaml of and for OpenAPI specs. It currently supports:
 It may be extended to support:
 
 - Generation of OpenAPI specs from values inhabiting the family of types.
-- Generation of server boilerplate.
+- Generation of a server's edge.
+
+* Approach
+
+- OooapI should produce an OCaml library satisfying the target OpenAPI spec. It
+  should not generate boilerplate for an OCaml client.
+- Extension, revision, or alteration of the generated client library should be
+  done via the OCaml module system and shadowing the generated code, not by
+  editing the generated code.
+- As little code should be dynamically generated as possible. Instead, put all
+  reusable logic into a library.
+
+* Alternatives
+
+[[https://github.com/OpenAPITools/openapi-generator/][OpenAPI Generator]] includes a generator that is meant to produce OCaml client boilerplate.
+
+* Motivation
+
+At the time work on this library was initiated, the OCaml client generation
+supplied by OpenAPI Generator had the following documented errors:
+
+- https://github.com/OpenAPITools/openapi-generator/issues/12767
+- https://github.com/OpenAPITools/openapi-generator/issues/12572
+- https://github.com/OpenAPITools/openapi-generator/issues/8397
+- https://github.com/OpenAPITools/openapi-generator/issues/16890
+
+To see the current known errors, see https://github.com/OpenAPITools/openapi-generator/issues?q=is%3Aissue+is%3Aopen+ocaml
+
+In our usage, we encountered additional errors around edgecases, that would
+result in generation of syntactically invalid OCaml programs.
+
+We explored contributing fixes to the generator, but after investigating the
+implementation, we came to the conclusion that the approach to generation via
+[[https://github.com/OpenAPITools/openapi-generator/tree/c6a4947523dd079492d3604d45e451a31f5e94a7/modules/openapi-generator/src/main/resources/ocaml][mustache templates]] was too fragile and ad hoc be worth our time investment. We
+hope that approaching this problem through a principled metaprogramming
+approach, leveraging OCaml's ppx system and supporting libraries, will enable a
+more modular and a more implementation.
+
+* Footnotes
+
+[fn:1] Pronounced variously "ooo-ah-pea", "ooo-ah-pie",  "oh-oh-oh-ay-pee-eye",
+as any other way you like.
