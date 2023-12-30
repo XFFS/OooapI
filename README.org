@@ -47,17 +47,19 @@ supplied by OpenAPI Generator had the following documented errors:
 
 To see the current known errors, see https://github.com/OpenAPITools/openapi-generator/issues?q=is%3Aissue+is%3Aopen+ocaml
 
-In our usage, we encountered additional errors around edgecases, that would
-result in generation of syntactically invalid OCaml programs.
+In our usage, we encountered additional errors around edge cases resulted in
+generation of syntactically invalid OCaml programs. We ended up generating
+(a nontrivial amount of) broken code that required significant manual fixes.
 
 We explored contributing fixes to the generator, but after investigating the
 implementation, we came to the conclusion that the approach to generation via
-[[https://github.com/OpenAPITools/openapi-generator/tree/c6a4947523dd079492d3604d45e451a31f5e94a7/modules/openapi-generator/src/main/resources/ocaml][mustache templates]] was too fragile and ad hoc be worth our time investment. We
-hope that approaching this problem through a principled metaprogramming
+[[https://github.com/OpenAPITools/openapi-generator/tree/c6a4947523dd079492d3604d45e451a31f5e94a7/modules/openapi-generator/src/main/resources/ocaml][mustache templates]] was too fragile and ad hoc to be worth the invested time.
+
+We hope that approaching this problem through a principled metaprogramming
 approach, leveraging OCaml's ppx system and supporting libraries, will enable a
-more modular and a more implementation.
+more modular and a more correct implementation.
 
 * Footnotes
 
 [fn:1] Pronounced variously "ooo-ah-pea", "ooo-ah-pie",  "oh-oh-oh-ay-pee-eye",
-as any other way you like.
+or any other way you like.
