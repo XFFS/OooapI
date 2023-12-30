@@ -12,5 +12,5 @@ To run the end to end tests against the OpenAI API
 
 #+begin_src sh
 export OPENAI_API_KEY=<your-api-key>
-export OOOAPI_LOCAL_TEST=true
+export LOCAL_TESTS=true
 #+end_src

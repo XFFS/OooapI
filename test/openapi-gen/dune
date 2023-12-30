@@ -25,6 +25,8 @@
 
 (cram
  (deps ./test_openai.exe)
- ;; we don't want to run this test in CI because it eats OpenAPI credits
- (enabled_if %{env:OOOAPI_LOCAL_TEST=false})
+ ; we don't want to run this test in CI because it eats OpenAPI credits
+ ; The `=false` sets the default value, so we only run these tests if
+ ; LOCAL_TESTS is `true`.
+ (enabled_if %{env:LOCAL_TESTS=false})
  )
