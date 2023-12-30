@@ -1,4 +1,10 @@
-open AstUtil
+(** This module provides a representation of the module structure
+    used as a utility library for the generated OCaml client. *)
+
+(* TODO: Should this just be moved into a library that can be imported? *)
+
+(* Bring the ppxlib location in scope for the metaquote ppx *)
+let loc = AstUtil.loc
 
 let endpoint =
   [%str
@@ -151,7 +157,7 @@ let endpoint =
                 (Some data_body, [ ("Content-Type", "application/json") ])
           | Some (`Multipart_form data_parts) ->
               let* form = Multipart.form_of_data data_parts in
-              let headers, data_body  =
+              let headers, data_body =
                 Multipart_form_cohttp.Client.multipart_form form
               in
               Lwt.return (Some data_body, Cohttp.Header.to_list headers)

@@ -1,7 +1,8 @@
-(* re-exported just for testing *)
-module DAG = DAG
 open Ppxlib
 open AstUtil
+
+(* re-exported just for testing *)
+module DAG = DAG
 
 (* TODO some objects are not being converted correctly, e.g., the `Engine` schema *)
 module DataModule = struct

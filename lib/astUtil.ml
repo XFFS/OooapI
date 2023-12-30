@@ -1,5 +1,6 @@
-open Ppxlib
 (** Utilities to ease the pain of ast construction a bit *)
+
+open Ppxlib
 
 module OcamlBuiltins : sig
   val is_keyword : string -> bool

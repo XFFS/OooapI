@@ -1,3 +1,5 @@
+(* A simple DAG library, used for dependency resolution  *)
+
 module Make : functor (O : Map.OrderedType) -> sig
   type t
   type node = O.t
