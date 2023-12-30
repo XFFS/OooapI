@@ -16,3 +16,6 @@ yq < ./thespec.yaml > ./thespec.json
 * Tasks
 ** TODO Automate conversion of yaml to json for specs, via yq
 ** TODO Support url encoded forms
+** TODO Move hardcoded ppx module into library that can be imported?
+** TODO Generate OpenAPI specs from ocaml values
+** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
