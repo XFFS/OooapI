@@ -40,6 +40,7 @@ It may be extended to support:
 At the time work on this library was initiated, the OCaml client generation
 supplied by OpenAPI Generator had the following documented errors:
 
+- https://github.com/OpenAPITools/openapi-generator/issues/14987
 - https://github.com/OpenAPITools/openapi-generator/issues/12767
 - https://github.com/OpenAPITools/openapi-generator/issues/12572
 - https://github.com/OpenAPITools/openapi-generator/issues/8397
