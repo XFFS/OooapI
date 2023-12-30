@@ -244,6 +244,7 @@ module DataModule = struct
     in
     Json_schema.root schema |> gather_deps
 
+  (* The DAG is used for dependency analysis *)
   module Graph = DAG.Make (String)
 
   let of_components (components : Openapi_spec.components option) =
