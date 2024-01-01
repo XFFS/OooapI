@@ -12,10 +12,13 @@ let from_file file =
     if file |> String.ends_with ~suffix:".json" then
       of_json
     else
-      failwith "Only JSON supported"
+      (* TODO Support YAML input (requires a YAML parser that supports anchors etc.) *)
+      raise (Invalid_argument "Only JSON is currently supported")
   in
-  In_channel.(with_open_text file input_all)
-  |> decoder
+  if not (Sys.file_exists file) then
+    Error (`Msg ("File " ^ file ^ " does not exist or cannot be read"))
+  else
+    In_channel.(input_all |> with_open_text file |> decoder)
 
 (** TODO: Figure out conversion from/to YAML? *)
 

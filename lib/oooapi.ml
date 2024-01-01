@@ -4,14 +4,9 @@ open AstUtil
 (* re-exported just for testing *)
 module DAG = DAG
 
-(* TODO some objects are not being converted correctly, e.g., the `Engine` schema *)
 module DataModule = struct
   (* TODO Account for constraints, like pattern, min/max format etc.?
      This could be thru abstract types or thru validators in constructors *)
-
-  (* TODO: Add support for ppx_make derivation *)
-  (* let deriving_attrs = *)
-  (*   [ AstExt.attr_ident ~name:"deriving" "yojson {strict = false}" ] *)
 
   let deriving_attrs ~is_record =
     if is_record then
@@ -26,7 +21,7 @@ module DataModule = struct
       ]
 
   let rec module_name_of_def_ref : Json_query.path -> string = function
-    | [] -> failwith "unsupported component query path"
+    | [] -> failwith "invalid component query path"
     | [ `Field n ] -> Camelsnakekebab.upper_camel_case n
     | _ :: rest -> module_name_of_def_ref rest
 
@@ -282,6 +277,8 @@ module DataModule = struct
 end
 
 module EndpointsModule = struct
+  exception Invalid_data of string
+
   module Params = struct
     type param =
       { name : string
@@ -308,25 +305,36 @@ module EndpointsModule = struct
       (* Unsupported schemas *)
       | Id_ref _ ->
           raise
-            (Invalid_argument "param_of_json_schema_element given id_ref schema")
+            (Invalid_argument
+               "string_conv_and_format_of_elem_kind given id_ref schema")
       | Ext_ref _ ->
           raise
             (Invalid_argument
-               "param_of_json_schema_element given ext_ref schema")
+               "string_conv_and_format_of_elem_kind given ext_ref schema")
       | Dummy ->
           raise
-            (Invalid_argument "param_of_json_schema_element given dummy schema")
+            (Invalid_argument
+               "string_conv_and_format_of_elem_kind given dummy schema")
       | Array (_, _) ->
           raise
-            (Invalid_argument "param_of_json_schema_element given het-array")
+            (Invalid_argument
+               "string_conv_and_format_of_elem_kind given het-array")
       | Object _ ->
-          raise (Invalid_argument "param_of_json_schema_element given object")
+          raise
+            (Invalid_argument "string_conv_and_format_of_elem_kind given object")
       | Def_ref _ ->
-          raise (Invalid_argument "param_of_json_schema_element given def-ref")
+          raise
+            (Invalid_argument
+               "string_conv_and_format_of_elem_kind given def-ref")
       | Monomorphic_array (_, _) ->
-          raise (Invalid_argument "param_of_json_schema_element given array")
+          (* TODO Why are we not currently supportin array? *)
+          raise
+            (Invalid_argument "string_conv_and_format_of_elem_kind given array")
+      | Any ->
+          (* TODO Why not accept JSON here? *)
+          raise
+            (Invalid_argument "string_conv_and_format_of_elem_kind given any")
       (* Supported schemas *)
-      | Any -> raise (Invalid_argument "param_of_json_schema_element given any")
       | Null -> ([%expr fun _ -> "null"], None)
       | Boolean -> ([%expr string_of_bool], None)
       | Integer _ -> ([%expr string_of_int], None)
@@ -369,11 +377,16 @@ module EndpointsModule = struct
                | `Bool b -> Ast.ebool b
                | `Int i -> (
                    (* JS doesn't distinguish between `Number` "types", so we have be sure we
-                      decode the default correctly in case it is given in an integral form when
+                      decode the default correctly in case it is given in an integer form when
                       it should be a float. *)
                    match elem.kind with
+                   | Integer _ -> Ast.eint i
                    | Number _ -> Ast.efloat (string_of_float (float_of_int i))
-                   | _ -> Ast.eint i)
+                   | _ ->
+                       raise
+                         (Invalid_data
+                            "Numerical value given as default for schema \
+                             specifying non-numerical type"))
                | `Float f -> Ast.efloat (string_of_float f)
                | unsupported_default ->
                    failwith
@@ -498,7 +511,7 @@ module EndpointsModule = struct
     match operation.responses |> List.assoc_opt "200" with
     | None ->
         (* https://spec.openapis.org/oas/v3.1.0#responses-object *)
-        failwith "Invalid schema: no 200 response"
+        raise (Invalid_data "Invalid schema: no 200 response")
     | Some r ->
     match Option.bind r.content (List.assoc_opt "application/json") with
     | None -> unsupported
@@ -511,7 +524,6 @@ module EndpointsModule = struct
         let mod_name = DataModule.module_name_of_def_ref p in
         let conv_fun = Ast.evar (data_module_fun_name mod_name "of_yojson") in
         [%expr of_json_string [%e conv_fun]]
-    (* TODO handle other schemas gracefully *)
     | _ -> unsupported
 
   let path_parts path : expression =
@@ -667,17 +679,6 @@ module EndpointsModule = struct
     in
     [%stri let [%p name] = [%e fun_with_params ~data:Ast.punit params body]]
 
-  (* multipart:
-
-     - abstract function parts -> form
-     - post_fun also requires components
-     - check that path requires multipart
-     - if so, we need to examine component:
-       - all properties of component become params to function
-     - each param needs must be prepared as a part option (string of file path)
-     - concat all present parts into list and bass to Multipart form
-      - construct header and body from form, then add all header stuff to header
-  *)
   let post_fun : Openapi_spec.components -> operation_function =
    fun components path operation ->
     let name = operation_function_name operation path in
@@ -714,10 +715,11 @@ module EndpointsModule = struct
 
   (** Construct the AST node of the module with all endpoint functions *)
   let of_paths :
-         Openapi_spec.components
-      -> string * Openapi_spec.paths
+         Openapi_spec.components option
+      -> string
+      -> Openapi_spec.paths
       -> structure_item list =
-   fun components (base_uri, endpoints) ->
+   fun components base_uri endpoints ->
     let endpoint_functor =
       let functor_param =
         Named
@@ -736,7 +738,10 @@ module EndpointsModule = struct
           ]
         in
         let endpoint_functions =
-          endpoints |> List.map (endpoint components) |> List.flatten
+          match components with
+          | Some components ->
+              endpoints |> List.map (endpoint components) |> List.flatten
+          | None -> []
         in
         Ast.pmod_structure (decls @ endpoint_functions)
       in
@@ -767,18 +772,39 @@ let notice () =
     tm_min
     tm_sec
 
+let open_api_major_version s : int =
+  Option.value ~default:0
+  @@
+  match String.split_on_char '.' s with
+  | n :: _ -> int_of_string_opt n
+  | _ -> None
+
 let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
  fun spec ->
+  (* TODO support for other versions? *)
+  if not (open_api_major_version spec.openapi >= 3) then
+    failwith
+      ("Required OpenAPI version 3 or later, spec is for version "
+      ^ spec.openapi);
+
   let base_uri =
     match spec.servers with
     | None
     | Some [] ->
-        failwith "No servers specified"
-    | Some (s :: _) -> s
+        (* https://spec.openapis.org/oas/v3.1.0#openapi-object
+           > If the servers property is not provided, or is an empty array, the
+           default value would be a Server Object with a url value of /. *)
+        "/"
+    | Some (s :: _) ->
+        (* NOTE: Currently we are just using the first server.
+           What should we do if there are multiple servers? *)
+        s.url
   in
-  (* TODO safe handling of optional components *)
   [%stri let __NOTE__ = [%e Ast.estring (notice ())]]
+  :: [%stri let __TITLE__ = [%e Ast.estring spec.info.title]]
+  :: [%stri let __API_VERSION__ = [%e Ast.estring spec.info.version]]
   :: DataModule.of_components spec.components
   :: EndpointsModule.of_paths
-       (Option.get spec.components)
-       (base_uri.url, Option.value ~default:[] spec.paths)
+       spec.components
+       base_uri
+       (Option.value ~default:[] spec.paths)

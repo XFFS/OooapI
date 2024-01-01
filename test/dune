@@ -1,8 +1,5 @@
 (tests
  (names tests)
  (libraries openapi_spec lib tezt)
- (deps openapi-openai.json
-       tictactoe.json))
-
-(cram
- (deps %{bin:oooapi}))
+ (deps openai-blackbox/openapi-openai.json
+       cli-blackbox/tictactoe.json))

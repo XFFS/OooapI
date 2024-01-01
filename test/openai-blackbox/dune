@@ -1,4 +1,14 @@
-; TODO: Generate as part of portable component
+(copy_files
+ (files ../openapi-openai.json))
+
+(rule
+ (target openai_api.ml)
+ (deps %{bin:oooapi}
+       (:openai openapi-openai.json))
+ (action
+  (with-stdout-to %{target}
+    (run oooapi %{openai}))))
+
 (library
  (name openai_api)
  (modules openai_api)
@@ -10,14 +20,6 @@
             uuidm)
  (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
 
-(rule
- (target openai_api.ml)
- (deps %{bin:oooapi}
-       (:openai openapi-openai.json))
- (action
-  (with-stdout-to %{target}
-    (run oooapi %{openai}))))
-
 (executable
  (name test_openai)
  (modules test_openai)
@@ -28,5 +30,4 @@
  ; we don't want to run this test in CI because it eats OpenAPI credits
  ; The `=false` sets the default value, so we only run these tests if
  ; LOCAL_TESTS is `true`.
- (enabled_if %{env:LOCAL_TESTS=false})
- )
+ (enabled_if %{env:LOCAL_TESTS=false}))

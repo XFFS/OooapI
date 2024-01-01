@@ -20,6 +20,9 @@ It may be extended to support:
 
 - Generation of OpenAPI specs from values inhabiting the family of types.
 - Generation of a server's edge.
+- Generation of specific components: e.g., data serialization, or HTTP glue
+  code.
+- Generation for different stacks: e.g., Async, Httpaf, Eio
 
 * Approach
 
@@ -48,7 +51,7 @@ supplied by OpenAPI Generator had the following documented errors:
 
 To see the current known errors, see https://github.com/OpenAPITools/openapi-generator/issues?q=is%3Aissue+is%3Aopen+ocaml
 
-In our usage, we encountered additional errors around edge cases resulted in
+In our usage, we encountered additional errors around edge cases resulting in
 generation of syntactically invalid OCaml programs. We ended up generating
 (a nontrivial amount of) broken code that required significant manual fixes.
 
