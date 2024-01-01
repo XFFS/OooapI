@@ -1,6 +1,3 @@
-(copy_files
- (files ../openapi-openai.json))
-
 (rule
  (target openai_api.ml)
  (deps %{bin:oooapi}
@@ -21,13 +18,6 @@
  (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
 
 (executable
- (name test_openai)
+ (public_name test_openai)
  (modules test_openai)
  (libraries openai_api cohttp-lwt-unix))
-
-(cram
- (deps ./test_openai.exe)
- ; we don't want to run this test in CI because it eats OpenAPI credits
- ; The `=false` sets the default value, so we only run these tests if
- ; LOCAL_TESTS is `true`.
- (enabled_if %{env:LOCAL_TESTS=false}))
