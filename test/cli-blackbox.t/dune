@@ -8,11 +8,5 @@
 
 (library
  (name tictactoe_api)
- (libraries yojson
-            cohttp-lwt-unix
-            multipart_form
-            multipart_form-lwt
-            multipart_form-cohttp-lwt
-            uuidm
-            oooapi_lib)
+ (libraries oooapi_lib)
  (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))

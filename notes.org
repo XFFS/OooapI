@@ -27,11 +27,12 @@ yq < ./thespec.yaml > ./thespec.json
 I think this should be more ergonomic and concise.
 ** TODO Automate conversion of yaml to json for specs, via yq
 ** TODO Support url encoded forms
-** TODO Move hardcoded ppx module into library that can be imported
+** DONE Move hardcoded ppx module into library that can be imported
 This then also takes care of all needed dependencies!
 ** TODO Generate OpenAPI specs from ocaml values
 ** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
-** TODO Add generation of a dune stanza
+** KILL Add generation of a dune stanza
+Not needed know that we supply a library.
 * On OpenAPI and JSON Schema
 ** =parameters= for an endpoint can be specified in two different ways, and consumers of a spec are responsible for detecting overrides
 This amounts to an ad hoc, bizarre method of doing inheritance.
