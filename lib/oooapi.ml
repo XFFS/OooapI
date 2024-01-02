@@ -694,6 +694,7 @@ module EndpointsModule = struct
     let body =
       [%expr
         make_request
+          ~base_url
           ~path:[%e path_parts path]
           ~params:[%e query_params params.query]
           ~headers:[%e extra_headers params.header]
@@ -723,6 +724,7 @@ module EndpointsModule = struct
       [%expr
         make_request
           ?data:[%e data_conv]
+          ~base_url
           ~path:[%e path_parts path]
           ~params:[%e query_params params.query]
           ~headers:[%e extra_headers params.header]
@@ -747,24 +749,20 @@ module EndpointsModule = struct
       -> string
       -> Openapi_spec.paths
       -> structure_item list =
-   fun components base_uri endpoints ->
+   fun components base_url endpoints ->
     let endpoint_functor =
-      let functor_param =
+      let endpoint_functor_param =
+        Named
+          ( n (Some "Client")
+          , Ast.pmty_ident (n (Astlib.Longident.parse "Oooapi_lib.Client")) )
+      in
+      let config_functor_param =
         Named
           ( n (Some "Config")
           , Ast.pmty_ident (n (Astlib.Longident.parse "Oooapi_lib.Config")) )
       in
       let mod_impl =
-        let decls =
-          [ [%stri
-              include
-                Oooapi_lib.EndpointLib
-                  (struct
-                    let uri = [%e Ast.estring base_uri]
-                  end)
-                  (Config)]
-          ]
-        in
+        let decls = [ [%stri open Oooapi_lib.Cohttp_client (Config)] ] in
         let endpoint_functions =
           match components with
           | Some components ->
@@ -773,9 +771,12 @@ module EndpointsModule = struct
         in
         Ast.pmod_structure (decls @ endpoint_functions)
       in
-      Ast.pmod_functor functor_param mod_impl
+      Ast.pmod_functor endpoint_functor_param
+      @@ Ast.pmod_functor config_functor_param
+      @@ mod_impl
     in
-    [ Ast.module_binding ~name:(n (Some "Endpoint")) ~expr:endpoint_functor
+    [ [%stri let base_url = [%e Ast.estring base_url]]
+    ; Ast.module_binding ~name:(n (Some "Make")) ~expr:endpoint_functor
       |> Ast.pstr_module
     ]
 end

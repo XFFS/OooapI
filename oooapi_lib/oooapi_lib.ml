@@ -103,18 +103,11 @@ end = struct
     form parts
 end
 
-module EndpointLib (Server : Server) (Config : Config) = struct
-  let base_uri = Server.uri
-
-  let default_headers =
-    let headers =
-      match Config.default_headers with
-      | None -> Cohttp.Header.init ()
-      | Some hs -> hs
-    in
-    match Config.bearer_token with
-    | None -> headers
-    | Some token -> Cohttp.Header.add headers "Authorization" ("Bearer " ^ token)
+module type Client = functor (_ : Config) -> sig
+  type data =
+    [ `Json of Yojson.Safe.t
+    | `Multipart_form of Multipart.part_data list
+    ]
 
   type request_err =
     [ `Request of Cohttp.Code.status_code * string
@@ -123,52 +116,89 @@ module EndpointLib (Server : Server) (Config : Config) = struct
 
   type 'a request_result = ('a, request_err) result Lwt.t
 
-  type data =
-    [ `Json of Yojson.Safe.t
-    | `Multipart_form of Multipart.part_data list
-    ]
+  val of_json_string : (Yojson.Safe.t -> 'a) -> string -> 'a
 
-  let of_json_string f s = f (Yojson.Safe.from_string s)
-
-  let make_request
-      ?(data : data option)
-      ~(path : string list)
-      ~(params : (string * string) list)
-      ~(headers : (string * string) list)
-      ~(decode : string -> ('resp, string) result)
-      (meth : Cohttp.Code.meth) =
-    let open Lwt.Syntax in
-    let* body, content_headers =
-      match data with
-      | None -> Lwt.return (None, [])
-      | Some (`Json data_json) ->
-          let data_str = Yojson.Safe.to_string data_json in
-          let data_body = Cohttp_lwt.Body.of_string data_str in
-          Lwt.return (Some data_body, [ ("Content-Type", "application/json") ])
-      | Some (`Multipart_form data_parts) ->
-          let* form = Multipart.form_of_data data_parts in
-          let headers, data_body =
-            Multipart_form_cohttp.Client.multipart_form form
-          in
-          Lwt.return (Some data_body, Cohttp.Header.to_list headers)
-    in
-    let uri =
-      let path_parts = base_uri :: path in
-      let uri_str = String.concat "/" path_parts in
-      let base_uri = Uri.of_string uri_str in
-      Uri.add_query_params' base_uri params
-    in
-    let req_headers =
-      Cohttp.Header.add_list default_headers (headers @ content_headers)
-    in
-    let* resp, resp_body =
-      Cohttp_lwt_unix.Client.call ~headers:req_headers ?body meth uri
-    in
-    let+ resp_body_str = Cohttp_lwt.Body.to_string resp_body in
-    match resp.status with
-    | `OK -> (
-        match decode resp_body_str with
-        | Ok resp_data -> Ok resp_data
-        | Error e -> Error (`Deseriaization (resp_body_str, e)))
-    | other -> Error (`Request (other, resp_body_str))
+  val make_request :
+       ?data:data
+    -> base_url:string
+    -> path:string list
+    -> params:(string * string) list
+    -> headers:(string * string) list
+    -> decode:(string -> ('resp, string) result)
+    -> Cohttp.Code.meth
+    -> 'resp request_result
 end
+
+module Cohttp_client : Client =
+functor
+  (Config : Config)
+  ->
+  struct
+    let default_headers =
+      let headers =
+        match Config.default_headers with
+        | None -> Cohttp.Header.init ()
+        | Some hs -> hs
+      in
+      match Config.bearer_token with
+      | None -> headers
+      | Some token ->
+          Cohttp.Header.add headers "Authorization" ("Bearer " ^ token)
+
+    type request_err =
+      [ `Request of Cohttp.Code.status_code * string
+      | `Deseriaization of string * string
+      ]
+
+    type 'a request_result = ('a, request_err) result Lwt.t
+
+    type data =
+      [ `Json of Yojson.Safe.t
+      | `Multipart_form of Multipart.part_data list
+      ]
+
+    let of_json_string f s = f (Yojson.Safe.from_string s)
+
+    let make_request
+        ?(data : data option)
+        ~(base_url : string)
+        ~(path : string list)
+        ~(params : (string * string) list)
+        ~(headers : (string * string) list)
+        ~(decode : string -> ('resp, string) result)
+        (meth : Cohttp.Code.meth) : 'resp request_result =
+      let open Lwt.Syntax in
+      let* body, content_headers =
+        match data with
+        | None -> Lwt.return (None, [])
+        | Some (`Json data_json) ->
+            let data_str = Yojson.Safe.to_string data_json in
+            let data_body = Cohttp_lwt.Body.of_string data_str in
+            Lwt.return (Some data_body, [ ("Content-Type", "application/json") ])
+        | Some (`Multipart_form data_parts) ->
+            let* form = Multipart.form_of_data data_parts in
+            let headers, data_body =
+              Multipart_form_cohttp.Client.multipart_form form
+            in
+            Lwt.return (Some data_body, Cohttp.Header.to_list headers)
+      in
+      let uri =
+        let path_parts = base_url :: path in
+        let uri_str = String.concat "/" path_parts in
+        let base_uri = Uri.of_string uri_str in
+        Uri.add_query_params' base_uri params
+      in
+      let req_headers =
+        Cohttp.Header.add_list default_headers (headers @ content_headers)
+      in
+      let* resp, resp_body =
+        Cohttp_lwt_unix.Client.call ~headers:req_headers ?body meth uri
+      in
+      let+ resp_body_str = Cohttp_lwt.Body.to_string resp_body in
+      match resp.status with
+      | `OK -> (
+          match decode resp_body_str with
+          | Ok resp_data -> Ok resp_data
+          | Error e -> Error (`Deseriaization (resp_body_str, e)))
+      | other -> Error (`Request (other, resp_body_str))
+  end

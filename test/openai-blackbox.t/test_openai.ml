@@ -4,7 +4,7 @@ module Config : Oooapi_lib.Config = struct
 end
 
 module Data = Openai_api.Data
-module Api = Openai_api.Endpoint (Config)
+module Api = Openai_api.Make (Oooapi_lib.Cohttp_client) (Config)
 
 let main =
   let open Lwt.Syntax in
