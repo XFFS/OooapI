@@ -166,19 +166,40 @@ module DataModule = struct
         match (element.kind : Json_schema.element_kind) with
         | Combine (_, _)
         | Any ->
-            AstExt.Type.decl "t" ~attributes ~manifest:[%type: Yojson.Safe.t]
-        | Null -> AstExt.Type.decl "t" ~attributes ~manifest:[%type: unit]
-        | Boolean -> AstExt.Type.decl "t" ~attributes ~manifest:[%type: bool]
-        | String _ -> AstExt.Type.decl "t" ~attributes ~manifest:[%type: string]
-        | Integer _ -> AstExt.Type.decl "t" ~attributes ~manifest:[%type: int]
-        | Number _ -> AstExt.Type.decl "t" ~attributes ~manifest:[%type: float]
+            AstExt.Type.decl
+              type_name
+              ~attributes
+              ~manifest:[%type: Yojson.Safe.t]
+        | Null -> AstExt.Type.decl type_name ~attributes ~manifest:[%type: unit]
+        | Boolean ->
+            AstExt.Type.decl type_name ~attributes ~manifest:[%type: bool]
+        | String _ ->
+            AstExt.Type.decl type_name ~attributes ~manifest:[%type: string]
+        | Integer _ ->
+            AstExt.Type.decl type_name ~attributes ~manifest:[%type: int]
+        | Number _ ->
+            AstExt.Type.decl type_name ~attributes ~manifest:[%type: float]
         | Object o -> type_decl_of_object ~name:type_name o
         | Monomorphic_array (elem, _) ->
-            gather_declarations ~type_name:"item" elem;
-            AstExt.Type.decl "t" ~attributes ~manifest:[%type: item list]
-        (* TODO: Support for one_of *)
-        (* TODO: Error on unsupported types? Or better to leave placeholder..  *)
-        | Def_ref _
+            let item_type_name = type_name ^ "_item" in
+            let item_type = AstExt.Type.t item_type_name [] in
+            gather_declarations ~type_name:item_type_name elem;
+            AstExt.Type.decl
+              type_name
+              ~attributes
+              ~manifest:[%type: [%t item_type] list]
+        | Def_ref _ ->
+            AstExt.Type.decl
+              type_name
+              ~kind:
+                (Ptype_variant
+                   [ Ast.constructor_declaration
+                       ~name:(n "Unimplemented_def_ref")
+                       ~args:(Pcstr_tuple [])
+                       ~res:None
+                   ])
+        (* TODO: Error on unsupported types? Or better to leave placeholder..
+           Why not just jason? *)
         | Id_ref _
         | Ext_ref _
         | Array (_, _)
@@ -486,8 +507,10 @@ module EndpointsModule = struct
                      { acc with path = of_openapi_parameter p :: acc.path }
                  | "header" ->
                      { acc with header = of_openapi_parameter p :: acc.header }
+                 | "cookie" ->
+                     failwith ("unsupported parameter location " ^ p.in_)
                  | unsupported ->
-                     failwith ("unsupported parameter location " ^ unsupported))
+                     failwith ("invalid parameter location " ^ unsupported))
   end
 
   type operation_function =
@@ -677,6 +700,11 @@ module EndpointsModule = struct
           ~decode:[%e decode_resp]
           `GET]
     in
+
+    (* TODO We are missing the path parameters supplied by reference here! Why?
+              We seem to be totally ignoring the params?
+
+       NOTE: The problem is that parameters can be specified in two different place: at the path level, and at the override level.*)
     [%stri let [%p name] = [%e fun_with_params ~data:Ast.punit params body]]
 
   let post_fun : Openapi_spec.components -> operation_function =

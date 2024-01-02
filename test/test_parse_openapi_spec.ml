@@ -20,8 +20,7 @@ unit
 ;;
 
 test "can parse openapi spec" @@ fun () ->
-let json = In_channel.(with_open_text "openapi-openai.json" input_all) in
-match Openapi_spec.of_json json with
+match Openapi_spec.from_file "openapi-openai.json" with
 | Ok _ -> unit
 | Error (`Msg err) -> Test.fail "parse failure: %s" err
 | exception exn ->
@@ -29,9 +28,26 @@ match Openapi_spec.of_json json with
 ;;
 
 test "can parse tictactoe example spec" @@ fun () ->
-let json = In_channel.(with_open_text "tictactoe.json" input_all) in
-match Openapi_spec.of_json json with
-| Ok _ -> unit
+match Openapi_spec.from_file "tictactoe.json" with
 | Error (`Msg err) -> Test.fail "parse failure: %s" err
 | exception exn ->
     Test.fail "exception while paring: %S" (Printexc.to_string exn)
+| Ok spec ->
+match spec.paths with
+| None -> Test.fail "tictactoe spec missing paths"
+| Some paths ->
+match
+  let path = Openapi_spec.Openapi_path.of_string "/board/{row}/{column}" in
+  List.assoc_opt path paths
+with
+| None -> Test.fail "tictactoe spec missing expected path /board/{row}/{column}"
+| Some path_item ->
+match path_item.parameters with
+| None
+| Some [] ->
+    Test.fail "tictactoe spec missing expected path parameters"
+| Some [ `Ref _; `Ref _ ] -> unit
+| Some _ ->
+    Test.fail
+      "tictactoe spec does not have expected, ref parameter in \
+       /board/{row}/{column} path"

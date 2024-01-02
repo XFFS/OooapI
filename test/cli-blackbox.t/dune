@@ -1,14 +1,13 @@
 (rule
- (target openai_api.ml)
+ (target tictactoe_api.ml)
  (deps %{bin:oooapi}
-       (:spec openapi-openai.json))
+       (:spec tictactoe.json))
  (action
   (with-stdout-to %{target}
     (run oooapi %{spec}))))
 
 (library
- (name openai_api)
- (modules openai_api)
+ (name tictactoe_api)
  (libraries yojson
             cohttp-lwt-unix
             multipart_form
@@ -16,8 +15,3 @@
             multipart_form-cohttp-lwt
             uuidm)
  (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
-
-(executable
- (public_name test_openai)
- (modules test_openai)
- (libraries openai_api cohttp-lwt-unix))

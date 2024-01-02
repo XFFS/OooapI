@@ -14,6 +14,14 @@ yq < ./thespec.yaml > ./thespec.json
 #+end_src
 
 * Tasks
+** TODO Map OpenAPI to a more sensible data structure
+*** Reuse Cohttp's =http= types as much as possible.
+- But this does not fully suffice, b/c
+  - no support for representing path parameters
+  - no support for representing body
+  - headers are abstract
+*** Resources
+-
 ** TODO Automate conversion of yaml to json for specs, via yq
 ** TODO Support url encoded forms
 ** TODO Move hardcoded ppx module into library that can be imported
@@ -21,3 +29,11 @@ This then also takes care of all needed dependencies!
 ** TODO Generate OpenAPI specs from ocaml values
 ** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
 ** TODO Add generation of a dune stanza
+* On OpenAPI and JSON Schema
+** =parameters= for an endpoint can be specified in two different ways, and consumers of a spec are responsible for detecting overrides
+This amounts to an ad hoc, bizarre method of doing inheritance.
+
+See the =parameters= property in these places
+
+- https://spec.openapis.org/oas/latest.html#operationObject
+- https://spec.openapis.org/oas/latest.html#path-item-object

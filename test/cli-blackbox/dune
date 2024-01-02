@@ -1,4 +1,0 @@
-(cram
- (deps
-  %{bin:oooapi}
-  tictactoe.json))

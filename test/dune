@@ -2,10 +2,10 @@
  (files openai-blackbox.t/openapi-openai.json))
 
 (copy_files
- (files cli-blackbox/tictactoe.json))
+ (files cli-blackbox.t/tictactoe.json))
 
-(tests
- (names tests)
+(test
+ (name tests)
  (libraries openapi_spec lib tezt)
  (deps openapi-openai.json
        tictactoe.json))

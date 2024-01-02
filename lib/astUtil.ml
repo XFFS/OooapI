@@ -110,6 +110,9 @@ module AstExt = struct
     let v ptyp_desc : core_type =
       { ptyp_desc; ptyp_loc = loc; ptyp_loc_stack = []; ptyp_attributes = [] }
 
+    (** [t n args] is the type derived by applying the constructor [n] to [args], e.g., [t list [int_t]] is [int list] *)
+    let t name args = Ast.ptyp_constr (Ast.Located.lident name) args
+
     (** A type constructor
 
         E.g., [constr "Foo" [int, str]] makes the type constructor [(int, str) Foo] *)
