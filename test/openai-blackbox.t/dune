@@ -9,12 +9,7 @@
 (library
  (name openai_api)
  (modules openai_api)
- (libraries yojson
-            cohttp-lwt-unix
-            multipart_form
-            multipart_form-lwt
-            multipart_form-cohttp-lwt
-            uuidm)
+ (libraries oooapi_lib)
  (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
 
 (executable

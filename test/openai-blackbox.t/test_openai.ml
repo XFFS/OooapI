@@ -1,4 +1,4 @@
-module Config : Openai_api.Config = struct
+module Config : Oooapi_lib.Config = struct
   let default_headers = None
   let bearer_token = Sys.getenv_opt "OPENAI_API_KEY"
 end

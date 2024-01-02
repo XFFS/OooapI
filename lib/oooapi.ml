@@ -752,13 +752,13 @@ module EndpointsModule = struct
       let functor_param =
         Named
           ( n (Some "Config")
-          , Ast.pmty_ident (n (Astlib.Longident.parse "Config")) )
+          , Ast.pmty_ident (n (Astlib.Longident.parse "Oooapi_lib.Config")) )
       in
       let mod_impl =
         let decls =
           [ [%stri
               include
-                EndpointLib
+                Oooapi_lib.EndpointLib
                   (struct
                     let uri = [%e Ast.estring base_uri]
                   end)
@@ -775,10 +775,9 @@ module EndpointsModule = struct
       in
       Ast.pmod_functor functor_param mod_impl
     in
-    Oooapi_lib.endpoint
-    @ [ Ast.module_binding ~name:(n (Some "Endpoint")) ~expr:endpoint_functor
-        |> Ast.pstr_module
-      ]
+    [ Ast.module_binding ~name:(n (Some "Endpoint")) ~expr:endpoint_functor
+      |> Ast.pstr_module
+    ]
 end
 
 let write_ast_f fmt str =

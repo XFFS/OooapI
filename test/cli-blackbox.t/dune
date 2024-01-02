@@ -13,5 +13,6 @@
             multipart_form
             multipart_form-lwt
             multipart_form-cohttp-lwt
-            uuidm)
+            uuidm
+            oooapi_lib)
  (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
