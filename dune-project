@@ -25,6 +25,7 @@
   (multipart_form-cohttp-lwt (>= 0.5.0))
   (uuidm (>= 0.9.8))
   (cohttp-lwt-unix (>= 5.2.0))
+  (http (>= 6.0.0))
   (tls (>= 0.17.0))
   (tls-lwt (>= 0.17.0))
 

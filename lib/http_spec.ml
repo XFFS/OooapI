@@ -3,24 +3,48 @@
 
 type todo = TODO
 
-type 'a locator =
+type 'a param =
   { name : string
   ; pp : Format.formatter -> 'a -> unit
   }
 
+module Hlist (T : sig
+  type 'a t
+end) =
+struct
+  type _ t =
+    | Nil : unit t
+    | Cons : 'p T.t * 'params t -> ('p * 'params) t
+
+  let nil = Nil
+
+  let cons : type p params. p T.t -> params t -> (p * params) t =
+   fun p ps -> Cons (p, ps)
+
+  let ( @/ ) = cons
+end
+
+module Params = Hlist (struct
+  type 'a t = 'a param
+end)
+
+module Args = Hlist (struct
+  type 'a t = 'a
+end)
+
 module Resource : sig
+  module Param : sig
+    type 'a t = 'a param
+
+    val pp : 'a t -> Format.formatter -> 'a -> unit
+    val to_string : 'a t -> 'a -> string
+    val str : string -> string t
+    val int : string -> int t
+    val float : string -> float t
+    val bool : string -> bool t
+  end
+
   module Locator : sig
-    module Param : sig
-      type 'a t = 'a locator
-
-      val pp : 'a t -> Format.formatter -> 'a -> unit
-      val to_string : 'a t -> 'a -> string
-      val str : string -> string t
-      val int : string -> int t
-      val float : string -> float t
-      val bool : string -> bool t
-    end
-
     module Path : sig
       type _ t = private
         | Nil : unit t
@@ -36,37 +60,59 @@ module Resource : sig
       val to_string : 'params t -> string
     end
 
-    module Args : sig
-      type _ t = private
-        | Nil : unit t
-        | Cons : 'a * 'args t -> ('a * 'args) t
-
-      val nil : unit t
-      val cons : 'a -> 'args t -> ('a * 'args) t
-      val ( @/ ) : 'a -> 'args t -> ('a * 'args) t
-    end
-
-    type 'params t =
+    type ('path, 'query) t =
       { base : Uri.t
-      ; path : 'params Path.t
+      ; path : 'path Path.t
+      ; query : 'query Params.t
       }
 
-    val v : string -> 'params Path.t -> 'params t
-    val to_uri : 'params Args.t -> 'params t -> Uri.t
+    val v :
+         path:'params Path.t
+      -> query:'query Params.t
+      -> string
+      -> ('params, 'query) t
+
+    val to_uri :
+      ?path:'path Args.t -> ?query:'query Args.t -> ('path, 'query) t -> Uri.t
   end
+  (* Locator *)
+
+  (* TODO We need params for representation *)
+  (* module Representation : sig *)
+  (* module Content = struct *)
+  (*   type kind = `Json | Multipart_ *)
+  (*   type 'a t = *)
+  (*     { data : 'a option *)
+  (*     ; pp : Format.formatter -> 'a -> unit *)
+  (*     ; meta :  *)
+  (*     } *)
+  (* end *)
+
+  type ('path, 'query, 'header) args =
+    { path : 'path Args.t
+    ; query : 'query Args.t
+    ; header : 'header Args.t
+    }
+
+  type ('path, 'query, 'header) t =
+    { meth : Http.Method.t
+    ; locator : ('path, 'query) Locator.t
+    ; header : todo
+    ; content : todo
+    }
 end = struct
+  module Param = struct
+    type 'a t = 'a param
+
+    let pp t fmt x = t.pp fmt x
+    let to_string t x : string = Format.asprintf "%a%!" (pp t) x
+    let str name = { name; pp = Format.pp_print_string }
+    let int name = { name; pp = Format.pp_print_int }
+    let float name = { name; pp = Format.pp_print_float }
+    let bool name = { name; pp = Format.pp_print_bool }
+  end
+
   module Locator = struct
-    module Param = struct
-      type 'a t = 'a locator
-
-      let pp t fmt x = t.pp fmt x
-      let to_string t x : string = Format.asprintf "%a%!" (pp t) x
-      let str name = { name; pp = Format.pp_print_string }
-      let int name = { name; pp = Format.pp_print_int }
-      let float name = { name; pp = Format.pp_print_float }
-      let bool name = { name; pp = Format.pp_print_bool }
-    end
-
     module Path = struct
       type _ t =
         | Nil : unit t
@@ -104,46 +150,79 @@ end = struct
       let to_string t : string = Format.asprintf "%a%!" pp t
     end
 
-    module Args = struct
-      type _ t =
-        | Nil : unit t
-        | Cons : 'x * 'rest t -> ('x * 'rest) t
-
-      let nil = Nil
-
-      let cons (type a args) (x : a) (args : args t) : (a * args) t =
-        Cons (x, args)
-
-      let ( @/ ) = cons
-    end
-
-    type 'params t =
+    type ('path, 'query) t =
       { base : Uri.t
-      ; path : 'params Path.t
+      ; path : 'path Path.t
+      ; query : 'query Params.t
       }
 
-    let v base path = { base = Uri.of_string base; path }
+    let v :
+        type query path.
+        path:path Path.t -> query:query Params.t -> string -> (path, query) t =
+     fun ~path ~query base -> { base = Uri.of_string base; path; query }
 
-    let to_uri : type params. params Args.t -> params t -> Uri.t =
-     fun args t ->
+    let to_uri :
+        type path query.
+        ?path:path Args.t -> ?query:query Args.t -> (path, query) t -> Uri.t =
+     fun ?path ?query t ->
       let rec pp_path :
-          type params. Format.formatter -> params Path.t * params Args.t -> unit
-          =
+          type path.
+          Format.formatter -> path Path.t * path Args.t option -> unit =
        fun fmt -> function
-        | Path.Nil, Args.Nil -> ()
+        | Path.Nil, None -> ()
+        | Path.Nil, Some Args.Nil -> ()
         | Path.Const (s, Nil), _ -> Format.pp_print_string fmt s
         | Path.Const (s, path), args ->
             Format.fprintf fmt "%s/" s;
             pp_path fmt (path, args)
-        | Path.Param ((p : _ Param.t), Nil), Args.Cons (v, Nil) ->
+        | Path.Param ((p : _ Param.t), Nil), Some (Args.Cons (v, Nil)) ->
             Param.pp p fmt v
-        | Path.Param ((p : _ Param.t), path), Args.Cons (v, args) ->
+        | Path.Param ((p : _ Param.t), path), Some (Args.Cons (v, args)) ->
             Format.fprintf fmt "%a/" (Param.pp p) v;
-            pp_path fmt (path, args)
+            pp_path fmt (path, Some args)
+        | _, None ->
+            raise
+              (Invalid_argument
+                 "In Locator.to_uri ~path can only be None if t.path is Nil")
       in
-      Uri.of_string
-      @@ Format.asprintf "%a/%a%!" Uri.pp t.base pp_path (t.path, args)
+      let params :
+          type query.
+          query Params.t * query Args.t option -> (string * string) list =
+        function
+        | Params.Nil, None -> []
+        | params, Some args ->
+            let rec aux :
+                type q. q Params.t * q Args.t -> (string * string) list =
+              function
+              | Params.Nil, Args.Nil -> []
+              | Params.Cons (p, params), Args.Cons (a, args) ->
+                  (p.name, Param.to_string p a) :: aux (params, args)
+            in
+            aux (params, args)
+        | _, None ->
+            raise
+              (Invalid_argument
+                 "In Locator.to_uri ~query can only be None if t.query is Nil")
+      in
+      let uri =
+        Uri.of_string
+        @@ Format.asprintf "%a/%a%!" Uri.pp t.base pp_path (t.path, path)
+      in
+      Uri.add_query_params' uri (params (t.query, query))
   end
+
+  type ('path, 'query, 'header) args =
+    { path : 'path Args.t
+    ; query : 'query Args.t
+    ; header : 'header Args.t
+    }
+
+  type ('path, 'query, 'header) t =
+    { meth : Http.Method.t
+    ; locator : ('path, 'query) Locator.t
+    ; header : todo
+    ; content : todo
+    }
 end
 
 (* module S = struct *)

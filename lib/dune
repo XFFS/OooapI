@@ -5,5 +5,7 @@
   compiler-libs
   ppxlib
   camelsnakekebab
-  cohttp-lwt-unix)
+  cohttp-lwt-unix
+  http                          ; TODO?
+  )
  (preprocess (pps ppxlib.metaquot)))
