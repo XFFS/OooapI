@@ -6,7 +6,7 @@
 
 (test
  (name tests)
- (libraries openapi_spec lib tezt)
+ (libraries openapi_spec lib tezt expect_tests)
  (deps openapi-openai.json
        tictactoe.json))
 
