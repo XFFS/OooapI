@@ -1,3 +1,4 @@
+include Openapi_v
 include Openapi_t
 module Openapi_path = Openapi_path
 
@@ -64,18 +65,32 @@ let dereferenced_path_item : components -> path_item -> path_item =
       |> List.assoc_opt ref_id
       |> get_exn ~exn:(bad_ref ref')
 
-(* let dereferenced_parameter *)
+let dereferenced_parameter : components -> parameter or_ref -> parameter =
+ fun components o ->
+  match o with
+  | `Obj p -> p
+  | `Ref r ->
+      let ref_id = get_ref_id_for ~section:"parameters" r.ref_ in
+      components.parameters
+      |> List.assoc_opt ref_id
+      |> get_exn ~exn:(bad_ref r.ref_)
 
 (* Descend into all operations to replace paths *)
 let resolved_path_item : components -> path_item -> path_item =
- fun _components item -> item (* TODO *)
+ fun components item ->
+  let parameters =
+    Option.map
+      (List.map (fun p -> `Obj (dereferenced_parameter components p)))
+      item.parameters
+  in
+  { item with parameters }
 
 let resolve_refs : t -> t =
  fun spec ->
   let default : components =
     { schemas = None
     ; responses = None
-    ; parameters = None
+    ; parameters = []
     ; examples = None
     ; requestBodies = None
     ; headers = None

@@ -1,5 +1,6 @@
 open Tezt
 open Tezt.Base
+module O = Openapi_spec
 
 let test ?(tags = [ "openapi_spec" ]) title f =
   Test.register ~__FILE__ ~title ~tags f
@@ -72,7 +73,7 @@ let default_spec : Openapi_spec.t =
   ; externalDocs = None
   }
 
-let defualt_path_item : Openapi_spec.path_item =
+let default_path_item : Openapi_spec.path_item =
   { ref_ = None
   ; summary = None
   ; description = None
@@ -91,7 +92,7 @@ let defualt_path_item : Openapi_spec.path_item =
 let default_components : Openapi_spec.components =
   { schemas = None
   ; responses = None
-  ; parameters = None
+  ; parameters = []
   ; examples = None
   ; requestBodies = None
   ; headers = None
@@ -100,6 +101,9 @@ let default_components : Openapi_spec.components =
   ; callbacks = None
   ; pathItems = []
   }
+
+let ref_ str : _ Openapi_spec.or_ref =
+  `Ref { ref_ = str; description = None; summary = None }
 ;;
 
 test "detects errors on dangling reference" @@ fun () ->
@@ -107,7 +111,7 @@ let spec : Openapi_spec.t =
   { default_spec with
     paths =
       [ ( [ `C "foo" ]
-        , { defualt_path_item with
+        , { default_path_item with
             ref_ = Some "#/components/pathItems/fooPath"
           } )
       ]
@@ -125,7 +129,7 @@ let spec : Openapi_spec.t =
   { default_spec with
     paths =
       [ ( [ `C "foo" ]
-        , { defualt_path_item with
+        , { default_path_item with
             ref_ = Some "http://unsupported/reference/uri"
           } )
       ]
@@ -146,13 +150,13 @@ let spec : Openapi_spec.t =
   { default_spec with
     paths =
       [ ( path
-        , { defualt_path_item with ref_ = Some "#/components/pathItems/fooId" }
+        , { default_path_item with ref_ = Some "#/components/pathItems/fooId" }
         )
       ]
   ; components =
       Some
         { default_components with
-          pathItems = [ ("fooId", { defualt_path_item with summary }) ]
+          pathItems = [ ("fooId", { default_path_item with summary }) ]
         }
   }
 in
@@ -162,3 +166,32 @@ Check.(
     (option string)
     ~error_msg:"Expected path reference to be resolved");
 unit
+;;
+
+test "can resolve parameter references" @@ fun () ->
+let path = [ `C "foo" ] in
+let name = "fooParam" in
+let spec : O.t =
+  { default_spec with
+    paths =
+      [ ( path
+        , { default_path_item with
+            parameters = Some [ ref_ "#/components/parameters/fooParam" ]
+          } )
+      ]
+  ; components =
+      Some
+        { default_components with
+          parameters = [ (name, O.create_parameter ~name ~in_:"path" ()) ]
+        }
+  }
+in
+let resolved_spec = Openapi_spec.resolve_refs spec in
+match (List.assoc path resolved_spec.paths).parameters with
+| Some [ `Obj param ] ->
+    Check.(
+      (param.name = name)
+        string
+        ~error_msg:"Expected parameter reference to be resolved");
+    unit
+| _ -> Test.fail "Expected parameter was not found"

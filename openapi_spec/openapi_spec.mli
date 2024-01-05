@@ -1,4 +1,5 @@
 include module type of Openapi_t with type todo := Yojson.Safe.t
+include module type of Openapi_v
 
 val of_json : string -> (t, [ `Msg of string ]) Result.t
 val to_json : t -> string

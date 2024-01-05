@@ -47,9 +47,11 @@ type schema = json wrap <ocaml module="Json_schema_converter">
 (* https://spec.openapis.org/oas/v3.1.0#versions *)
 type version = string
 
-type json <ocaml module="Yojson.Safe" t="t"> = abstract
+(** JSON typed stuff *)
+type json <ocaml module="Json" t="t"> = abstract
 
-type todo <ocaml module="Yojson.Safe" t="t"> = abstract
+(** Things that aren't implemented yet *)
+type todo = json
 
 (* https://spec.openapis.org/oas/v3.1.0#infoObject *)
 type info =
@@ -206,7 +208,7 @@ type response =
 type components =
   { ?schemas : (string * schema) list <json repr="object"> option
   ; ?responses : todo option  (* Map[string, Response Object | Reference Object]  *)
-  ; ?parameters : todo option (* Map[string, Parameter Object | Reference Object]  *)
+  ; ~parameters : (string * parameter) list <json repr="object">
   ; ?examples : todo option (* Map[string, Example Object | Reference Object]  *)
   ; ?requestBodies : todo option (* Map[string, Request Body Object | Reference Object]  *)
   ; ?headers : todo option (* Map[string, Header Object | Reference Object]  *)
