@@ -529,10 +529,13 @@ module EndpointsModule = struct
     let mod_name = Camelsnakekebab.upper_camel_case mod_name in
     Ast.evar (data_module_fun_name mod_name "to_yojson")
 
-  let response_decoder (operation : Openapi_spec.operation) : expression =
+  let response_decoder (responses : (string * Openapi_spec.response) list) :
+      expression =
+    (* TODO What to do with this unsupported thing? *)
     let unsupported = [%expr fun x -> Ok x] in
-    match operation.responses |> List.assoc_opt "200" with
+    match responses |> List.assoc_opt "200" with
     | None ->
+        (* TODO This is only required if it is the ONLY response. So need to account for others *)
         (* https://spec.openapis.org/oas/v3.1.0#responses-object *)
         raise (Invalid_data "Invalid schema: no 200 response")
     | Some r ->
@@ -690,7 +693,7 @@ module EndpointsModule = struct
    fun path operation ->
     let name = operation_function_name operation path in
     let params = Params.of_openapi_parameters operation.parameters in
-    let decode_resp = response_decoder operation in
+    let decode_resp = response_decoder operation.responses in
     let body =
       [%expr
         make_request
@@ -719,7 +722,7 @@ module EndpointsModule = struct
         operation.requestBody
     in
     let params = { params with form = form_params } in
-    let decode_resp = response_decoder operation in
+    let decode_resp = response_decoder operation.responses in
     let body =
       [%expr
         make_request
@@ -817,13 +820,12 @@ let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
 
   let base_uri =
     match spec.servers with
-    | None
-    | Some [] ->
+    | [] ->
         (* https://spec.openapis.org/oas/v3.1.0#openapi-object
            > If the servers property is not provided, or is an empty array, the
            default value would be a Server Object with a url value of /. *)
         "/"
-    | Some (s :: _) ->
+    | s :: _ ->
         (* NOTE: Currently we are just using the first server.
            What should we do if there are multiple servers? *)
         s.url
@@ -832,7 +834,4 @@ let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
   :: [%stri let __TITLE__ = [%e Ast.estring spec.info.title]]
   :: [%stri let __API_VERSION__ = [%e Ast.estring spec.info.version]]
   :: DataModule.of_components spec.components
-  :: EndpointsModule.of_paths
-       spec.components
-       base_uri
-       (Option.value ~default:[] spec.paths)
+  :: EndpointsModule.of_paths spec.components base_uri spec.paths

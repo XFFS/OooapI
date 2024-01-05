@@ -33,12 +33,9 @@ match Openapi_spec.from_file "tictactoe.json" with
 | exception exn ->
     Test.fail "exception while paring: %S" (Printexc.to_string exn)
 | Ok spec ->
-match spec.paths with
-| None -> Test.fail "tictactoe spec missing paths"
-| Some paths ->
 match
   let path = Openapi_spec.Openapi_path.of_string "/board/{row}/{column}" in
-  List.assoc_opt path paths
+  List.assoc_opt path spec.paths
 with
 | None -> Test.fail "tictactoe spec missing expected path /board/{row}/{column}"
 | Some path_item ->

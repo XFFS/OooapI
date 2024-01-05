@@ -31,11 +31,11 @@ type reference =
 type t =
   { openapi : version
   ; info : info
-  ; ?servers : server list option
-  ; ?paths : paths option
+  ; ~servers : server list
+  ; ~paths : paths
+  ; ?components : components option
   ; ?jsonSchemaDialect : string option
   ; ?webhooks : webhooks option
-  ; ?components : components option
   ; ?security : security option
   ; ?tags : tags option
   ; ?externalDocs : externalDocs option
@@ -213,7 +213,7 @@ type components =
   ; ?securitySchemes : todo option (* Map[string, Security Scheme Object | Reference Object]  *)
   ; ?links : todo option (* Map[string, Link Object | Reference Object]  *)
   ; ?callbacks : todo option (* Map[string, Callback Object | Reference Object]  *)
-  ; ?pathItems : todo option (* Map[string, Path Item Object | Reference Object]  *)
+  ; ?pathItems : (string * path_item) list <json repr="object"> option
   }
 
 (* Map[string, Path Item Object | Reference Object] ] *)
