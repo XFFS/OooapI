@@ -1,250 +1,105 @@
-(* Cohttp's Http types *)
-(* open Http *)
+(** A simplified, normalized representation of HTTP API's *)
 
-type todo = TODO
+(* A message
 
-type 'a param =
-  { name : string
-  ; pp : Format.formatter -> 'a -> unit
+   > A client sends requests to a server in the form of a request message with a method (Section 9) and request target (Section 7.1). The request
+   might also contain header fields (Section 6.3) for request modifiers, client information, and representation metadata, content (Section 6.4)
+   intended for processing in accordance with the method, and trailer fields (Section 6.5) to communicate information collected while sending
+   the content.¶
+   >
+   > A server responds to a client's request by sending one or more response messages, each including a status code (Section 15). The response
+   might also contain header fields for server information, resource metadata, and representation metadata, content to be interpreted in
+   accordance with the status code, and trailer fields to communicate information collected while sending the content.¶
+*)
+
+module Message = struct
+  type to_data = Ppxlib.Ast.expression
+  type of_data = Ppxlib.Ast.expression
+
+  type param =
+    { name : string
+    ; required : bool
+    ; conv : to_data
+    }
+
+  (* Parameters that specialize a request *)
+  type params =
+    { path : param list
+    ; query : param list
+    ; header : param list
+    ; cookie : param list
+    }
+
+  type request =
+    { params : params
+    ; path : Openapi_spec.Openapi_path.t (* Locator *)
+    ; meth : Http.Method.t
+    ; content_conv : to_data option (* Representation (if applicable) *)
+    }
+
+  (* TODO: Support different status returns? E.g. via [`200 (of_data data)] *)
+  type responses = (Http.Status.t * of_data) list
+  type t = request * responses
+end
+
+type t =
+  { base_url : string
+  ; messages : Message.t list
   }
 
-module Hlist (T : sig
-  type 'a t
-end) =
-struct
-  type _ t =
-    | Nil : unit t
-    | Cons : 'p T.t * 'params t -> ('p * 'params) t
+exception Unsupported_reference of string * string
+exception Invalid_reference of string
 
-  let nil = Nil
+let bad_ref r = Invalid_reference r
 
-  let cons : type p params. p T.t -> params t -> (p * params) t =
-   fun p ps -> Cons (p, ps)
+let get_exn ~exn : 'a option -> 'a = function
+  | Some x -> x
+  | None -> raise exn
 
-  let ( @/ ) = cons
-end
+(* let with_component (components : Openapi_spec.components) ref' = *)
+(*   let get_ref_in_section section itemId = *)
+(*     get_exn ~exn:(Invalid_reference ref') *)
+(*     @@ *)
+(*     let ( let* ) = Option.bind in *)
+(*     match section with *)
+(*     | "schemas" -> *)
+(*         let* schemas = components.schemas in *)
+(*         let* schema = List.assoc_opt itemId schemas in *)
+(*         Some (`Schema schema) *)
+(*     | _ -> raise (Failure "TODO") *)
+(*   in *)
+(*   match String.split_on_char '/' ref' with *)
+(*   | [ "#"; "components"; section; itemId ] -> get_ref_in_section section itemId *)
+(*   | [ _; _; _; _ ] -> *)
+(*       raise *)
+(*         (Unsupported_reference *)
+(*            ( ref' *)
+(* , "Only references to the component section of this document are \ *)
+   (*               supported. I.e., refs starting with `#/components/`" )) *)
+(*   | _ -> raise (Unsupported_reference (ref', "Unkown reason")) *)
 
-module Params = Hlist (struct
-  type 'a t = 'a param
-end)
-
-module Args = Hlist (struct
-  type 'a t = 'a
-end)
-
-module Resource : sig
-  module Param : sig
-    type 'a t = 'a param
-
-    val pp : 'a t -> Format.formatter -> 'a -> unit
-    val to_string : 'a t -> 'a -> string
-    val str : string -> string t
-    val int : string -> int t
-    val float : string -> float t
-    val bool : string -> bool t
-  end
-
-  module Locator : sig
-    module Path : sig
-      type _ t = private
-        | Nil : unit t
-        | Const : string * 'params t -> 'params t
-        | Param : 'p Param.t * 'params t -> ('p * 'params) t
-
-      val nil : unit t
-      val cons : string -> 'params t -> 'params t
-      val ( @/ ) : string -> 'params t -> 'params t
-      val param : 'p Param.t -> 'params t -> ('p * 'params) t
-      val ( @? ) : 'p Param.t -> 'params t -> ('p * 'params) t
-      val pp : Format.formatter -> 'params t -> unit
-      val to_string : 'params t -> string
-    end
-
-    type ('path, 'query) t =
-      { base : Uri.t
-      ; path : 'path Path.t
-      ; query : 'query Params.t
-      }
-
-    val v :
-         path:'params Path.t
-      -> query:'query Params.t
-      -> string
-      -> ('params, 'query) t
-
-    val to_uri :
-      ?path:'path Args.t -> ?query:'query Args.t -> ('path, 'query) t -> Uri.t
-  end
-  (* Locator *)
-
-  (* TODO We need params for representation *)
-  (* module Representation : sig *)
-  (* module Content = struct *)
-  (*   type kind = `Json | Multipart_ *)
-  (*   type 'a t = *)
-  (*     { data : 'a option *)
-  (*     ; pp : Format.formatter -> 'a -> unit *)
-  (*     ; meta :  *)
-  (*     } *)
-  (* end *)
-
-  type ('path, 'query, 'header) args =
-    { path : 'path Args.t
-    ; query : 'query Args.t
-    ; header : 'header Args.t
-    }
-
-  type ('path, 'query, 'header) t =
-    { meth : Http.Method.t
-    ; locator : ('path, 'query) Locator.t
-    ; header : todo
-    ; content : todo
-    }
-end = struct
-  module Param = struct
-    type 'a t = 'a param
-
-    let pp t fmt x = t.pp fmt x
-    let to_string t x : string = Format.asprintf "%a%!" (pp t) x
-    let str name = { name; pp = Format.pp_print_string }
-    let int name = { name; pp = Format.pp_print_int }
-    let float name = { name; pp = Format.pp_print_float }
-    let bool name = { name; pp = Format.pp_print_bool }
-  end
-
-  module Locator = struct
-    module Path = struct
-      type _ t =
-        | Nil : unit t
-        | Const : string * 'params t -> 'params t
-        | Param : 'p Param.t * 'params t -> ('p * 'params) t
-
-      let nil = Nil
-
-      let cons : type params. string -> params t -> params t =
-       fun s path -> Const (s, path)
-
-      let ( @/ ) s path = cons s path
-
-      let param : type p params. p Param.t -> params t -> (p * params) t =
-       fun p path -> Param (p, path)
-
-      let ( @? ) p path = param p path
-
-      let pp : type a. Format.formatter -> a t -> unit =
-       fun fmt path ->
-        let rec pp_path : type a. Format.formatter -> a t -> unit =
-         fun fmt -> function
-          | Nil -> ()
-          | Const (s, Nil) -> Format.pp_print_string fmt s
-          | Const (s, path) ->
-              Format.fprintf fmt "%s/" s;
-              pp_path fmt path
-          | Param (p, Nil) -> Format.fprintf fmt "{%s}" p.name
-          | Param (p, path) ->
-              Format.fprintf fmt "{%s}/" p.name;
-              pp_path fmt path
+let resolve_refs : Openapi_spec.t -> Openapi_spec.t =
+  let open Openapi_spec in
+  fun spec ->
+    match spec.components with
+    | None -> spec (* All refs are located in components? *)
+    | Some components ->
+        let paths =
+          spec.paths
+          |> List.map (function
+                 | (_, { ref_ = None; _ }) as entry -> entry
+                 (* In case a Path Item Object field appears both in the defined
+                    object and the referenced object, the behavior is undefined.
+                    See https://spec.openapis.org/oas/latest.html#fixed-fields-6*)
+                 | path, { ref_ = Some ref'; _ } ->
+                     let item' =
+                       get_exn ~exn:(bad_ref ref') components.pathItems
+                       |> List.assoc_opt ref'
+                       |> get_exn ~exn:(bad_ref ref')
+                     in
+                     (path, item'))
+          (* TODO Need to go into each path and replace those refs *)
         in
-        pp_path fmt path
+        { spec with paths }
 
-      let to_string t : string = Format.asprintf "%a%!" pp t
-    end
-
-    type ('path, 'query) t =
-      { base : Uri.t
-      ; path : 'path Path.t
-      ; query : 'query Params.t
-      }
-
-    let v :
-        type query path.
-        path:path Path.t -> query:query Params.t -> string -> (path, query) t =
-     fun ~path ~query base -> { base = Uri.of_string base; path; query }
-
-    let to_uri :
-        type path query.
-        ?path:path Args.t -> ?query:query Args.t -> (path, query) t -> Uri.t =
-     fun ?path ?query t ->
-      let rec pp_path :
-          type path.
-          Format.formatter -> path Path.t * path Args.t option -> unit =
-       fun fmt -> function
-        | Path.Nil, None -> ()
-        | Path.Nil, Some Args.Nil -> ()
-        | Path.Const (s, Nil), _ -> Format.pp_print_string fmt s
-        | Path.Const (s, path), args ->
-            Format.fprintf fmt "%s/" s;
-            pp_path fmt (path, args)
-        | Path.Param ((p : _ Param.t), Nil), Some (Args.Cons (v, Nil)) ->
-            Param.pp p fmt v
-        | Path.Param ((p : _ Param.t), path), Some (Args.Cons (v, args)) ->
-            Format.fprintf fmt "%a/" (Param.pp p) v;
-            pp_path fmt (path, Some args)
-        | _, None ->
-            raise
-              (Invalid_argument
-                 "In Locator.to_uri ~path can only be None if t.path is Nil")
-      in
-      let params :
-          type query.
-          query Params.t * query Args.t option -> (string * string) list =
-        function
-        | Params.Nil, None -> []
-        | params, Some args ->
-            let rec aux :
-                type q. q Params.t * q Args.t -> (string * string) list =
-              function
-              | Params.Nil, Args.Nil -> []
-              | Params.Cons (p, params), Args.Cons (a, args) ->
-                  (p.name, Param.to_string p a) :: aux (params, args)
-            in
-            aux (params, args)
-        | _, None ->
-            raise
-              (Invalid_argument
-                 "In Locator.to_uri ~query can only be None if t.query is Nil")
-      in
-      let uri =
-        Uri.of_string
-        @@ Format.asprintf "%a/%a%!" Uri.pp t.base pp_path (t.path, path)
-      in
-      Uri.add_query_params' uri (params (t.query, query))
-  end
-
-  type ('path, 'query, 'header) args =
-    { path : 'path Args.t
-    ; query : 'query Args.t
-    ; header : 'header Args.t
-    }
-
-  type ('path, 'query, 'header) t =
-    { meth : Http.Method.t
-    ; locator : ('path, 'query) Locator.t
-    ; header : todo
-    ; content : todo
-    }
-end
-
-(* module S = struct *)
-(*   module type Resource = sig *)
-(*     module Locator : sig *)
-(*       include module type of T.Resource.Locator *)
-(*     end *)
-
-(*     type t = { location : Uri.t } *)
-(*     type representation *)
-(*   end *)
-
-(*   module Message (R : Resource) = struct *)
-(*     module type Request = sig *)
-(*       type t = *)
-(*         { resource : R.t *)
-(*         ; meth : Method.t *)
-(*         } *)
-(*     end *)
-
-(*     module type Response = sig *)
-(*       type t *)
-(*     end *)
-(*   end *)
-(* end *)
+let of_openapi_spec : Openapi_spec.t -> t = raise (Failure "TODO")

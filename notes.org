@@ -16,16 +16,9 @@ yq < ./thespec.yaml > ./thespec.json
 * Tasks
 ** TODO Map OpenAPI to a more sensible data structure
 *** Reuse Cohttp's =http= types as much as possible.
-- But this does not fully suffice, b/c
-  - no support for representing path parameters
-  - no support for representing body
-  - headers are abstract
-*** Resources
--
-*** TODO Try using Hmap for params https://erratique.ch/software/hmap/doc/Hmap
-
-I think this should be more ergonomic and concise.
 ** TODO Automate conversion of yaml to json for specs, via yq
+** TODO Content conversion
+https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
 ** TODO Support url encoded forms
 ** DONE Move hardcoded ppx module into library that can be imported
 This then also takes care of all needed dependencies!
@@ -41,3 +34,21 @@ See the =parameters= property in these places
 
 - https://spec.openapis.org/oas/latest.html#operationObject
 - https://spec.openapis.org/oas/latest.html#path-item-object
+** Specification of OpenAPI references are inconsistent and nonsensical
+Most objects that can be referenced do so by having a union type on the schema.
+E.g., =Header Object | Reference Object= is either a header object or a
+reference object.
+
+But for https://spec.openapis.org/oas/latest.html#pathItemObject, this
+alternative is indicated by an optional field on the object `$ref`, and a
+warning that if this field is used along with the other fields, the meaning is
+undefined. That is, each path item object has a field `$ref` that can refers to
+a path item object (wtf?), and if it does and any other fields are used, you
+have undefined semantics in your spec. This could be avoided by using a union
+type here as they do everywhere else.
+
+Worse: in the https://spec.openapis.org/oas/latest.html#componentsObject, the
+=pathItems= which can hold the referents for a referenced path items object has
+the type =Path Item Object | Reference Object=, so the reference can go to
+another reference, or to a path item object which can itself have reference in a
+different way.
