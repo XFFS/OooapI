@@ -35,7 +35,7 @@ module DataModule = struct
     (* We need to form and gather all declarations implied by the schema
        and we use this ref to collect them without having to thread the data thru *)
     let declarations = ref [] in
-    let root = Json_schema.root schema in
+    let root = Json_schema.root schema.schema in
     let rec gather_declarations :
         type_name:string -> Json_schema.element -> unit =
      fun ~type_name element ->
@@ -279,9 +279,9 @@ module DataModule = struct
             schemas
             |> ListLabels.fold_left
                  ~init:Graph.empty
-                 ~f:(fun graph (src, schema) ->
+                 ~f:(fun graph (src, (s : Openapi_spec.schema)) ->
                    (* Add each schema and its deps to the graph *)
-                   let deps = schema_deps schema in
+                   let deps = schema_deps s.schema in
                    Graph.add_arcs ~src deps graph)
           in
           let sorted_rev = Graph.topological_sort dep_graph in
@@ -450,7 +450,7 @@ module EndpointsModule = struct
                        p.name)
             in
             let default =
-              (Json_schema.root s).default
+              (Json_schema.root s.schema).default
               |> Option.map (Json_repr.any_to_repr (module Json_repr.Yojson))
               |> Option.map (function
                      | `String s -> Ast.estring s
@@ -545,7 +545,7 @@ module EndpointsModule = struct
     match m.schema with
     | None -> unsupported
     | Some s ->
-    match (Json_schema.root s).kind with
+    match (Json_schema.root s.schema).kind with
     | Def_ref p ->
         let mod_name = DataModule.module_name_of_def_ref p in
         let conv_fun = Ast.evar (data_module_fun_name mod_name "of_yojson") in
@@ -629,8 +629,8 @@ module EndpointsModule = struct
       -> expression * pattern * Params.param list =
     let from_json = function
       | None -> failwith ("Content type is missing schema: " ^ name)
-      | Some s ->
-      match ref_of_schema s with
+      | Some (s : Openapi_spec.schema) ->
+      match ref_of_schema s.schema with
       | None -> failwith ("only Ref_def supported for Json currently :" ^ name)
       | Some schema_name ->
           ( [%expr Some (`Json ([%e to_json_fun schema_name] data))]
@@ -638,8 +638,8 @@ module EndpointsModule = struct
           , [] )
     and from_multipart (components : Openapi_spec.components) = function
       | None -> failwith ("Content type is missing schema: " ^ name)
-      | Some s ->
-      match ref_of_schema s with
+      | Some (s : Openapi_spec.schema) ->
+      match ref_of_schema s.schema with
       | None ->
           failwith
             ("only Ref_def supported for multipart forms currently :" ^ name)
@@ -657,7 +657,7 @@ module EndpointsModule = struct
             ^ " referenced in operation "
             ^ name)
       | Some form_data_schema ->
-      match Json_schema.(root form_data_schema).kind with
+      match Json_schema.(root form_data_schema.schema).kind with
       | Object { properties; _ } ->
           let params =
             properties
