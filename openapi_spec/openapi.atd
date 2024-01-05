@@ -213,7 +213,7 @@ type components =
   ; ?securitySchemes : todo option (* Map[string, Security Scheme Object | Reference Object]  *)
   ; ?links : todo option (* Map[string, Link Object | Reference Object]  *)
   ; ?callbacks : todo option (* Map[string, Callback Object | Reference Object]  *)
-  ; ?pathItems : (string * path_item) list <json repr="object"> option
+  ; ~pathItems : (string * path_item) list <json repr="object">
   }
 
 (* Map[string, Path Item Object | Reference Object] ] *)
