@@ -54,3 +54,7 @@ Worse: in the https://spec.openapis.org/oas/latest.html#componentsObject, the
 the type =Path Item Object | Reference Object=, so the reference can go to
 another reference, or to a path item object which can itself have reference in a
 different way.
+
+** Treatment of fields is inconsistent
+E.g., the =description= field is, for no noted reason, required for =response
+objects=, while it is optional for (nearly?) every other object.

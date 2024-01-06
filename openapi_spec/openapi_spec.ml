@@ -138,6 +138,16 @@ let dereferenced_request_body :
                 req_body.content
           })
 
+let dereferenced_response : components -> response -> response =
+ fun components resp ->
+  { resp with
+    content =
+      resp.content
+      |> Option.map
+           (List.map (fun (key, media) ->
+                (key, dereferenced_media_type components media)))
+  }
+
 let dereferenced_operation : components -> operation option -> operation option
     =
  fun components oper ->
@@ -148,6 +158,11 @@ let dereferenced_operation : components -> operation option -> operation option
         { oper with
           parameters = dereferenced_parameters components oper.parameters
         ; requestBody = dereferenced_request_body components oper.requestBody
+        ; responses =
+            List.map
+              (fun (code, resp) ->
+                (code, dereferenced_response components resp))
+              oper.responses
         }
 
 (* Descend into all operations to replace paths *)

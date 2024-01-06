@@ -346,3 +346,58 @@ with
         ~error_msg:"Expected reference to be resolved");
     unit
 | _ -> Test.fail "Expected object was not found"
+;;
+
+test "can resolve response content reference" @@ fun () ->
+(* We also test nested references here: the request body is a
+   reference to a body that has a reference to a schema *)
+let path = [ `C "foo" ] in
+let name = "fooRespContent" in
+let spec : O.t =
+  (* This formatting is terrible. I blame ocamlformat *)
+  spec
+    ()
+    ~paths:
+      [ ( path
+        , O.create_path_item
+            ()
+            ~post:
+              (O.create_operation
+                 ()
+                 ~responses:
+                   [ ( "200"
+                     , O.create_response
+                         ()
+                         ~description:
+                           "Why is this the only required description field?"
+                         ~content:
+                           [ ( "application/json"
+                             , O.create_media_type
+                                 ()
+                                 ~schema:
+                                   (ref_schema ("#/components/schemas/" ^ name))
+                             )
+                           ] )
+                   ]) )
+      ]
+    ~components:(O.create_components () ~schemas:[ (name, dummy_schema_type) ])
+in
+let resolved_spec = O.resolve_refs spec in
+match
+  Option.map
+    (fun (x : O.operation) -> x.responses)
+    (List.assoc path resolved_spec.paths).post
+with
+| Some
+    [ ( "200"
+      , ({ content = Some [ ("application/json", { schema = Some schema; _ }) ]
+         ; _
+         } :
+          O.response) )
+    ] ->
+    Check.(
+      (schema.name = Some name)
+        (option string)
+        ~error_msg:"Expected reference to be resolved");
+    unit
+| _ -> Test.fail "Expected object was not found"
