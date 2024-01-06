@@ -89,18 +89,7 @@ let default_path_item : Openapi_spec.path_item =
   ; parameters = None
   }
 
-let default_components : Openapi_spec.components =
-  { schemas = None
-  ; responses = None
-  ; parameters = []
-  ; examples = None
-  ; requestBodies = None
-  ; headers = None
-  ; securitySchemes = None
-  ; links = None
-  ; callbacks = None
-  ; pathItems = []
-  }
+let default_components : Openapi_spec.components = O.create_components ()
 
 let ref_ str : _ Openapi_spec.or_ref =
   `Ref { ref_ = str; description = None; summary = None }
@@ -166,25 +155,30 @@ Check.(
     (option string)
     ~error_msg:"Expected path reference to be resolved");
 unit
+
+(* Make a spec with default args provided *)
+let spec =
+  O.create_t
+    ~openapi:"3.0.0"
+    ~info:(O.create_info ~title:"test spec" ~version:"0.1" ())
 ;;
 
-test "can resolve parameter references" @@ fun () ->
+test "can resolve path parameter references" @@ fun () ->
 let path = [ `C "foo" ] in
 let name = "fooParam" in
 let spec : O.t =
-  { default_spec with
-    paths =
+  spec
+    ~paths:
       [ ( path
-        , { default_path_item with
-            parameters = Some [ ref_ "#/components/parameters/fooParam" ]
-          } )
+        , O.create_path_item
+            ~parameters:[ ref_ ("#/components/parameters/" ^ name) ]
+            () )
       ]
-  ; components =
-      Some
-        { default_components with
-          parameters = [ (name, O.create_parameter ~name ~in_:"path" ()) ]
-        }
-  }
+    ~components:
+      (O.create_components
+         ~parameters:[ (name, O.create_parameter ~name ~in_:"path" ()) ]
+         ())
+    ()
 in
 let resolved_spec = Openapi_spec.resolve_refs spec in
 match (List.assoc path resolved_spec.paths).parameters with
@@ -195,3 +189,160 @@ match (List.assoc path resolved_spec.paths).parameters with
         ~error_msg:"Expected parameter reference to be resolved");
     unit
 | _ -> Test.fail "Expected parameter was not found"
+;;
+
+test "can resolve operation parameter references" @@ fun () ->
+let path = [ `C "foo" ] in
+let name = "fooParam" in
+let spec : O.t =
+  spec
+    ~paths:
+      [ ( path
+        , O.create_path_item
+            ~get:
+              (O.create_operation
+                 ~parameters:[ ref_ ("#/components/parameters/" ^ name) ]
+                 ())
+            () )
+      ]
+    ~components:
+      (O.create_components
+         ~parameters:[ (name, O.create_parameter ~name ~in_:"header" ()) ]
+         ())
+    ()
+in
+let resolved_spec = O.resolve_refs spec in
+match
+  Option.bind
+    (List.assoc path resolved_spec.paths).get
+    (fun (x : O.operation) -> x.parameters)
+with
+| Some [ `Obj param ] ->
+    Check.(
+      (param.name = name)
+        string
+        ~error_msg:"Expected parameter reference to be resolved");
+    unit
+| _ -> Test.fail "Expected parameter was not found"
+;;
+
+test "can resolve request body references" @@ fun () ->
+let path = [ `C "foo" ] in
+let name = "fooReqBody" in
+let spec : O.t =
+  spec
+    ~paths:
+      [ ( path
+        , O.create_path_item
+            ~get:
+              (O.create_operation
+                 ~requestBody:(ref_ ("#/components/requestBodies/" ^ name))
+                 ())
+            () )
+      ]
+    ~components:
+      (O.create_components
+         ~requestBodies:
+           [ ( name
+             , O.create_request_body ~description:"Foo req body" ~content:[] ()
+             )
+           ]
+         ())
+    ()
+in
+let resolved_spec = O.resolve_refs spec in
+match
+  Option.bind
+    (List.assoc path resolved_spec.paths).get
+    (fun (x : O.operation) -> x.requestBody)
+with
+| Some (`Obj req_body) ->
+    Check.(
+      (req_body.description = Some "Foo req body")
+        (option string)
+        ~error_msg:"Expected reference to be resolved");
+    unit
+| _ -> Test.fail "Expected object was not found"
+
+(* A schema thta is a ref *)
+let ref_schema ref' : O.schema =
+  { name = None
+  ; schema =
+      Json_schema.(
+        create
+          { kind = Id_ref ref'
+          ; title = None
+          ; description = None
+          ; default = None
+          ; enum = None
+          ; id = None
+          ; format = None
+          })
+  }
+
+let dummy_schema_type : O.schema =
+  { name = None
+  ; schema =
+      Json_schema.(
+        create
+          { kind = Boolean
+          ; title = Some "Test schema"
+          ; description = None
+          ; default = None
+          ; enum = None
+          ; id = None
+          ; format = None
+          })
+  }
+;;
+
+test "can resolve request body content references" @@ fun () ->
+(* We also test nested references here: the request body is a
+   reference to a body that has a reference to a schema *)
+let path = [ `C "foo" ] in
+let name = "fooReqBody" in
+let schema_name = "fooContentSchema" in
+let spec : O.t =
+  spec
+    ~paths:
+      [ ( path
+        , O.create_path_item
+            ()
+            ~get:
+              (O.create_operation
+                 ()
+                 ~requestBody:(ref_ ("#/components/requestBodies/" ^ name))) )
+      ]
+    ~components:
+      (O.create_components
+         ()
+         ~schemas:[ (schema_name, dummy_schema_type) ]
+         ~requestBodies:
+           [ ( name
+             , O.create_request_body
+                 ()
+                 ~description:"Foo req body"
+                 ~content:
+                   [ ( "application/json"
+                     , O.create_media_type
+                         ()
+                         ~schema:
+                           (ref_schema ("#/components/schemas/" ^ schema_name))
+                     )
+                   ] )
+           ])
+    ()
+in
+let resolved_spec = O.resolve_refs spec in
+match
+  Option.bind
+    (List.assoc path resolved_spec.paths).get
+    (fun (x : O.operation) -> x.requestBody)
+with
+| Some (`Obj { content = (_, { schema = Some schema; _ }) :: _; _ }) ->
+    Check.(
+      (schema.name = Some schema_name)
+        (option string)
+        ~error_msg:"Expected reference to be resolved");
+    unit
+| _ -> Test.fail "Expected object was not found"

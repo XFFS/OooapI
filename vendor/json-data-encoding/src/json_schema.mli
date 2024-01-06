@@ -132,14 +132,14 @@ and string_specs =
 val element : element_kind -> element
 (** Construct a naked element (all optional properties to None). *)
 
-val create : element -> schema
+val create : ?validate_refs:bool -> element -> schema
 (** Construct a schema from its root, without any definition ; the
     element is checked not to contain any [Def] element. *)
 
 val root : schema -> element
 (** Extract the root element from an existing schema. *)
 
-val update : element -> schema -> schema
+val update : ?validate_refs:bool -> element -> schema -> schema
 (** Update a schema from its root, using the definitions from an
     existing schema ; the element is checked to contain only valid
     [Def] elements ; unused definitions are kept, see {!simplify}. *)

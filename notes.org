@@ -26,6 +26,8 @@ This then also takes care of all needed dependencies!
 ** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
 ** KILL Add generation of a dune stanza
 Not needed know that we supply a library.
+** TODO Support operation-level server override
+See the server field in https://spec.openapis.org/oas/latest.html#fixed-fields-7
 * On OpenAPI and JSON Schema
 ** =parameters= for an endpoint can be specified in two different ways, and consumers of a spec are responsible for detecting overrides
 This amounts to an ad hoc, bizarre method of doing inheritance.

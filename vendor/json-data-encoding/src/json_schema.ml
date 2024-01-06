@@ -1316,7 +1316,7 @@ module Make (Repr : Json_repr.Repr) = struct
   (*-- creation and update ---------------------------------------------------*)
 
   (* Checks that all local refs and ids are defined *)
-  let check_definitions root definitions =
+  let check_definitions validate_refs root definitions =
     let collected_id_defs = ref [] in
     let collected_id_refs = ref [] in
     let rec check ({ kind; id } as elt) =
@@ -1348,7 +1348,7 @@ module Make (Repr : Json_repr.Repr) = struct
           | None -> ())
       | Combine (_, es) -> List.iter check es
       | Def_ref path ->
-          if not (definition_exists path definitions) then
+          if validate_refs && not (definition_exists path definitions) then
             let path = json_pointer_of_path path in
             raise (Dangling_reference (Uri.(with_fragment empty) (Some path)))
       | Id_ref id -> collected_id_refs := id :: !collected_id_refs
@@ -1368,19 +1368,19 @@ module Make (Repr : Json_repr.Repr) = struct
     (* check the domain of IDs *)
     List.iter
       (fun id ->
-        if not (List.mem_assoc id !collected_id_defs) then
+        if validate_refs && not (List.mem_assoc id !collected_id_defs) then
           raise (Dangling_reference Uri.(with_fragment empty (Some id))))
       !collected_id_refs;
     !collected_id_defs
 
-  let create root =
-    let ids = check_definitions root [] in
+  let create ?(validate_refs = false) root =
+    let ids = check_definitions validate_refs root [] in
     { root; definitions = []; world = []; ids; source = Uri.empty }
 
   let root { root } = root
 
-  let update root sch =
-    let ids = check_definitions root sch.definitions in
+  let update ?(validate_refs = false) root sch =
+    let ids = check_definitions validate_refs root sch.definitions in
     { sch with root; ids }
 
   let any = create (element Any)

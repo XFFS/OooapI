@@ -33,6 +33,8 @@ let get_exn ~exn : 'a option -> 'a = function
   | Some x -> x
   | None -> raise exn
 
+let get_name_of_ref ref = ref |> String.split_on_char '/' |> List.rev |> List.hd
+
 let get_ref_id_for ~(section : string) ref' : string =
   match String.split_on_char '/' ref' with
   | [ "#"; "components"; section'; item_id ] ->
@@ -40,8 +42,12 @@ let get_ref_id_for ~(section : string) ref' : string =
         item_id
       else
         raise
-          (Invalid_argument
-             ("get_ref_for_section called on unexpected section " ^ section'))
+          (Invalid_reference
+             (Printf.sprintf
+                "Invalid reference '%s' found in a location that should only \
+                 refer to objects in the section '#/components/%s'"
+                ref'
+                section))
   | [ _; _; _; _ ] ->
       (* All supported references to components sections should have 4 segments *)
       raise
@@ -50,6 +56,14 @@ let get_ref_id_for ~(section : string) ref' : string =
            , "Only references to the component section of this document are \
               supported. I.e., refs starting with `#/components/`" ))
   | _ -> raise (Unsupported_reference (ref', "Unkown reason"))
+
+let with_obj_of_ref
+    (ref' : string)
+    (assoc : (string * 'a) list)
+    ~(section : string)
+    ~(f : 'a -> 'b) : 'b =
+  let ref_id = get_ref_id_for ~section ref' in
+  assoc |> List.assoc_opt ref_id |> get_exn ~exn:(bad_ref ref') |> f
 
 (* We don't worry about the fact that a path_item can both be referenced
    and defined, because: "In case a Path Item Object field appears both in
@@ -60,49 +74,105 @@ let dereferenced_path_item : components -> path_item -> path_item =
   match item with
   | { ref_ = None; _ } -> item
   | { ref_ = Some ref'; _ } ->
-      let ref_id = get_ref_id_for ~section:"pathItems" ref' in
-      components.pathItems
-      |> List.assoc_opt ref_id
-      |> get_exn ~exn:(bad_ref ref')
+      with_obj_of_ref ref' components.pathItems ~section:"pathItems" ~f:Fun.id
 
-let dereferenced_parameter : components -> parameter or_ref -> parameter =
- fun components o ->
-  match o with
-  | `Obj p -> p
-  | `Ref r ->
-      let ref_id = get_ref_id_for ~section:"parameters" r.ref_ in
-      components.parameters
-      |> List.assoc_opt ref_id
-      |> get_exn ~exn:(bad_ref r.ref_)
+let dereferenced_parameters =
+  let dereferenced_parameter :
+      components -> parameter or_ref -> parameter or_ref =
+   fun components p ->
+    match p with
+    | `Obj _ -> p
+    | `Ref r ->
+        with_obj_of_ref
+          r.ref_
+          components.parameters
+          ~section:"parameters"
+          ~f:(fun x -> `Obj x)
+  in
+  fun components params ->
+    Option.map (List.map @@ dereferenced_parameter components) params
+
+let dereferenced_media_type : components -> media_type -> media_type =
+ fun components media ->
+  match media.schema with
+  | None -> media
+  | Some s ->
+  match ((Json_schema.root s.schema).kind : Json_schema.element_kind) with
+  | Id_ref ref' ->
+      with_obj_of_ref ref' components.schemas ~section:"schemas" ~f:(fun s ->
+          { media with
+            schema =
+              Some
+                { s with
+                  (* The name is the schema key *)
+                  (* TODO Should we be adding these names during deserialization? *)
+                  name = Some (get_name_of_ref ref')
+                }
+          })
+  | _ -> media
+
+let dereferenced_request_body :
+    components -> request_body or_ref option -> request_body or_ref option =
+ fun components orb ->
+  match orb with
+  | None -> orb (* Nothing to deref *)
+  | Some rb ->
+      let req_body : request_body =
+        (* We need to obtain the actual reference, so we can resolve its children *)
+        match rb with
+        | `Obj r -> r
+        | `Ref r ->
+            with_obj_of_ref
+              r.ref_
+              components.requestBodies
+              ~section:"requestBodies"
+              ~f:Fun.id
+      in
+      Some
+        (`Obj
+          { req_body with
+            content =
+              List.map
+                (fun (key, media) ->
+                  (key, dereferenced_media_type components media))
+                req_body.content
+          })
+
+let dereferenced_operation : components -> operation option -> operation option
+    =
+ fun components oper ->
+  match oper with
+  | None -> None
+  | Some oper ->
+      Some
+        { oper with
+          parameters = dereferenced_parameters components oper.parameters
+        ; requestBody = dereferenced_request_body components oper.requestBody
+        }
 
 (* Descend into all operations to replace paths *)
 let resolved_path_item : components -> path_item -> path_item =
  fun components item ->
-  let parameters =
-    Option.map
-      (List.map (fun p -> `Obj (dereferenced_parameter components p)))
-      item.parameters
-  in
-  { item with parameters }
+  let deref_op = dereferenced_operation components in
+  { item with
+    parameters = dereferenced_parameters components item.parameters
+  ; get = deref_op item.get
+  ; put = deref_op item.put
+  ; post = deref_op item.post
+  ; delete = deref_op item.delete
+  ; options = deref_op item.options
+  ; head = deref_op item.head
+  ; patch = deref_op item.patch
+  ; trace = deref_op item.trace
+  }
 
 let resolve_refs : t -> t =
  fun spec ->
-  let default : components =
-    { schemas = None
-    ; responses = None
-    ; parameters = []
-    ; examples = None
-    ; requestBodies = None
-    ; headers = None
-    ; securitySchemes = None
-    ; links = None
-    ; callbacks = None
-    ; pathItems = []
-    }
-  in
   (* If there is no components object, we still want to check the spec *)
   (* in case there are dangling references *)
-  let components = Option.value ~default spec.components in
+  let components =
+    Option.value ~default:(create_components ()) spec.components
+  in
   { spec with
     paths =
       spec.paths

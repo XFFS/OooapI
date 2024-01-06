@@ -271,7 +271,7 @@ module DataModule = struct
         let schemas =
           match components with
           | None -> []
-          | Some c -> c.schemas |> Option.value ~default:[]
+          | Some c -> c.schemas
         in
         let dep_ordering =
           let dep_graph =
@@ -644,12 +644,7 @@ module EndpointsModule = struct
           failwith
             ("only Ref_def supported for multipart forms currently :" ^ name)
       | Some schema_name ->
-      match components.schemas with
-      | None ->
-          failwith
-            ("Given ref to schemas but no schemas are specified for" ^ name)
-      | Some schemas ->
-      match List.assoc_opt schema_name schemas with
+      match List.assoc_opt schema_name components.schemas with
       | None ->
           failwith
             ("no schema exists for "
