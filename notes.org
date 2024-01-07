@@ -14,8 +14,9 @@ yq < ./thespec.yaml > ./thespec.json
 #+end_src
 
 * Tasks
-** TODO Map OpenAPI to a more sensible data structure
+** DONE Map OpenAPI to a more sensible data structure
 *** Reuse Cohttp's =http= types as much as possible.
+** TODO Add tests for http_spec mapping
 ** TODO Automate conversion of yaml to json for specs, via yq
 ** TODO Content conversion
 https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
