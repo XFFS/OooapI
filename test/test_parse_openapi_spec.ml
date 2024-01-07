@@ -176,7 +176,7 @@ let spec : O.t =
       ]
     ~components:
       (O.create_components
-         ~parameters:[ (name, O.create_parameter ~name ~in_:"path" ()) ]
+         ~parameters:[ (name, O.create_parameter ~name ~in_:`Path ()) ]
          ())
     ()
 in
@@ -207,7 +207,7 @@ let spec : O.t =
       ]
     ~components:
       (O.create_components
-         ~parameters:[ (name, O.create_parameter ~name ~in_:"header" ()) ]
+         ~parameters:[ (name, O.create_parameter () ~name ~in_:`Header) ]
          ())
     ()
 in

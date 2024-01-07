@@ -120,6 +120,14 @@ type operation =
   : server list option
   }
 
+(* https://spec.openapis.org/oas/latest.html#fixed-fields-9 See field 'in' *)
+type param_location =
+  [ Path <json name="path">
+  | Query <json name="query">
+  | Header <json name="header">
+  | Cookie <json name="cookie">
+  ]
+
 (* TODO Compute defaults and validate MUSTs *)
 type parameter =
   { name
@@ -131,7 +139,7 @@ type parameter =
     : string
   ; in_ <json name="in">
     <doc text="REQUIRED. The location of the parameter. Possible values are \"query\", \"header\", \"path\" or \"cookie\".">
-  : string
+  : param_location
   ; ?description
     <doc text="A brief description of the parameter. This could contain examples of use. CommonMark syntax MAY be used for rich text representation.">
   : string option

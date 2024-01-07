@@ -501,16 +501,15 @@ module EndpointsModule = struct
                           r.ref_)
                  | `Obj (p : Openapi_spec.parameter) ->
                  match p.in_ with
-                 | "query" ->
+                 | `Query ->
                      { acc with query = of_openapi_parameter p :: acc.query }
-                 | "path" ->
+                 | `Path ->
                      { acc with path = of_openapi_parameter p :: acc.path }
-                 | "header" ->
+                 | `Header ->
                      { acc with header = of_openapi_parameter p :: acc.header }
-                 | "cookie" ->
-                     failwith ("unsupported parameter location " ^ p.in_)
-                 | unsupported ->
-                     failwith ("invalid parameter location " ^ unsupported))
+                 | `Cookie ->
+                     (* TODO *)
+                     failwith "unsupported parameter location 'cookie")
   end
 
   type operation_function =
@@ -813,7 +812,7 @@ let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
       ("Required OpenAPI version 3 or later, spec is for version "
       ^ spec.openapi);
 
-  let base_uri =
+  let base_url =
     match spec.servers with
     | [] ->
         (* https://spec.openapis.org/oas/v3.1.0#openapi-object
@@ -829,4 +828,4 @@ let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
   :: [%stri let __TITLE__ = [%e Ast.estring spec.info.title]]
   :: [%stri let __API_VERSION__ = [%e Ast.estring spec.info.version]]
   :: DataModule.of_components spec.components
-  :: EndpointsModule.of_paths spec.components base_uri spec.paths
+  :: EndpointsModule.of_paths spec.components base_url spec.paths
