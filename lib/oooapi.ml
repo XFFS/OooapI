@@ -649,62 +649,15 @@ module EndpointsModule = struct
       | `Multipart_form -> from_multipart schema
       | `Html -> raise (Failure "TODO")
 
-  (* (\** A function to make a get request *\) *)
-  (* let get_fun : operation_function = *)
-  (*  fun path operation -> *)
-  (*   let name = operation_function_name operation path in *)
-  (*   let params = Params.of_openapi_parameters operation.parameters in *)
-  (*   let decode_resp = response_decoder operation.responses in *)
-  (*   let body = *)
-  (*     [%expr *)
-  (*       make_request *)
-  (*         ~base_url *)
-  (*         ~path:[%e path_parts path] *)
-  (*         ~params:[%e query_params params.query] *)
-  (*         ~headers:[%e extra_headers params.header] *)
-  (*         ~decode:[%e decode_resp] *)
-  (*         `GET] *)
-  (*   in *)
-
-  (*   (\* TODO We are missing the path parameters supplied by reference here! Why? *)
-  (*             We seem to be totally ignoring the params? *)
-
-  (*      NOTE: The problem is that parameters can be specified in two different place: at the path level, and at the override level.*\) *)
-  (*   [%stri let [%p name] = [%e fun_with_params ~data:Ast.punit params body]] *)
-
-  (* let post_fun : Openapi_spec.components -> operation_function = *)
-  (*  fun components path operation -> *)
-  (*   let name = operation_function_name operation path in *)
-  (*   let params = Params.of_openapi_parameters operation.parameters in *)
-  (*   let data_conv, data_param, form_params = *)
-  (*     data_conv_and_param *)
-  (*       ?name:operation.operationId *)
-  (*       components *)
-  (*       operation.requestBody *)
-  (*   in *)
-  (*   let params = { params with form = form_params } in *)
-  (*   let decode_resp = response_decoder operation.responses in *)
-  (*   let body = *)
-  (*     [%expr *)
-  (*       make_request *)
-  (*         ?data:[%e data_conv] *)
-  (*         ~base_url *)
-  (*         ~path:[%e path_parts path] *)
-  (*         ~params:[%e query_params params.query] *)
-  (*         ~headers:[%e extra_headers params.header] *)
-  (*         ~decode:[%e decode_resp] *)
-  (*         `POST] *)
-  (*   in *)
-  (*   [%stri let [%p name] = [%e fun_with_params ~data:data_param params body]] *)
-
   (* TODO rename to operation_fun? *)
-  let endpoint : Http_spec.Message.t -> structure_item =
+  let operation_fun_expr : Http_spec.Message.t -> structure_item =
    fun message ->
     let name = operation_function_name message.req.id in
     let params = Params.of_openapi_parameters message.req.params in
     let data_conv, data_param, form_params = data_conv_and_param message.req in
     let params = { params with form = form_params } in
     let decode_resp = response_decoder message.resp in
+    let meth = Ast.pexp_variant (Http.Method.to_string message.req.meth) None in
     let body =
       [%expr
         make_request
@@ -714,14 +667,9 @@ module EndpointsModule = struct
           ~params:[%e query_params params.query]
           ~headers:[%e extra_headers params.header]
           ~decode:[%e decode_resp]
-          `POST]
+          [%e meth]]
     in
     [%stri let [%p name] = [%e fun_with_params ~data:data_param params body]]
-
-  (* [ (get_fun path, path_item.get) *)
-  (* ; (post_fun components path, path_item.post) *)
-  (* ] *)
-  (* |> List.filter_map (fun (f, operation) -> Option.map f operation) *)
 
   (** Construct the AST node of the module with all endpoint functions *)
   let of_messages : Http_spec.Message.t list -> string -> structure_item list =
@@ -739,7 +687,7 @@ module EndpointsModule = struct
       in
       let mod_impl =
         let decls = [ [%stri open Oooapi_lib.Cohttp_client (Config)] ] in
-        let endpoint_functions = messages |> List.map endpoint in
+        let endpoint_functions = messages |> List.map operation_fun_expr in
         Ast.pmod_structure (decls @ endpoint_functions)
       in
       Ast.pmod_functor endpoint_functor_param

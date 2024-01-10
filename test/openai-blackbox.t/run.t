@@ -7,7 +7,7 @@ Generate the library and build the test utility, based on the dune file
 Test that we can hit a few endpoints.
 NOTE: Remove the grep to see the results.
 
-  $ dune exec test_openai | grep 'OK'
+  $ dune exec test_openai
   list_models: OK
   create_completion: OK
 
