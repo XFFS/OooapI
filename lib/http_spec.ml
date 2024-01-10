@@ -5,6 +5,28 @@ module Ast = Ppxlib.Ast
 
 exception Invalid_spec of string
 
+(* A string map *)
+module SM = Map.Make (String)
+
+type kind =
+  [ `Json
+  | `Multipart_form
+  | `Html
+  ]
+
+let kind_of_media_type = function
+  | "application/json" -> `Json
+  | "multipart/form-data" -> `Multipart_form
+  | "text/html" -> `Html
+  | media_type -> raise (Invalid_spec ("unsupported media type " ^ media_type))
+
+type schema =
+  { name : string
+  ; schema : O.schema
+  ; kind : kind
+  }
+(** All schemas in the http_spec must have a name, this should be unique *)
+
 (** A message
 
    > A client sends requests to a server in the form of a request message with a method (Section 9) and request target (Section 7.1). The request
@@ -26,7 +48,7 @@ module Message = struct
   module Params : sig
     type param =
       { required : bool
-      ; schema : O.schema
+      ; schema : schema
       }
 
     type t
@@ -37,19 +59,51 @@ module Message = struct
     val query : t -> (string * param) list
     val header : t -> (string * param) list
     val cookie : t -> (string * param) list
+    val schemas : t -> schema list
   end = struct
-    module M = Map.Make (String)
+    module M = SM
 
     type param =
       { required : bool
-      ; schema : O.schema
+      ; schema : schema
       }
 
-    let param_of_openapi : O.parameter -> param =
-     fun param ->
-      { required = param.required
-      ; schema = param.schema |> get ~msg:"no schema in parameter"
-      }
+    let param_of_openapi : section:string -> O.parameter -> param =
+     fun ~section param ->
+      let default_name = Printf.sprintf "%s_param_%s" section param.name in
+      let schema =
+        match param.schema with
+        | Some schema ->
+            { name = schema.name |> Option.value ~default:default_name
+            ; kind = `Json
+            ; schema
+            }
+        | None ->
+            let media_type, content =
+              param.content
+              |> Option.value ~default:[]
+              |> (fun l -> List.nth_opt l 0)
+              |> get
+                   ~msg:
+                     (Printf.sprintf
+                        "Parameter %s has neither schema nor content"
+                        param.name)
+            in
+            let schema =
+              content.schema
+              |> get
+                   ~msg:
+                     (Printf.sprintf
+                        "Parameter %s has neither schema nor content"
+                        param.name)
+            in
+            let kind = kind_of_media_type media_type in
+            { name = schema.name |> Option.value ~default:default_name
+            ; kind
+            ; schema
+            }
+      in
+      { required = param.required; schema }
 
     (* Parameters that specialize a request *)
     type t =
@@ -72,16 +126,30 @@ module Message = struct
            (fun t' (p : O.parameter) ->
              match p.in_ with
              | `Path ->
-                 { t' with path = M.add p.name (param_of_openapi p) t'.path }
+                 { t' with
+                   path =
+                     M.add p.name (param_of_openapi ~section:"path" p) t'.path
+                 }
              | `Query ->
-                 { t' with query = M.add p.name (param_of_openapi p) t'.query }
+                 { t' with
+                   query =
+                     M.add p.name (param_of_openapi ~section:"query" p) t'.query
+                 }
              | `Header ->
                  { t' with
-                   header = M.add p.name (param_of_openapi p) t'.header
+                   header =
+                     M.add
+                       p.name
+                       (param_of_openapi ~section:"header" p)
+                       t'.header
                  }
              | `Cookie ->
                  { t' with
-                   cookie = M.add p.name (param_of_openapi p) t'.cookie
+                   cookie =
+                     M.add
+                       p.name
+                       (param_of_openapi ~section:"cookie" p)
+                       t'.cookie
                  })
            init
 
@@ -89,6 +157,14 @@ module Message = struct
     let query t = M.bindings t.query
     let header t = M.bindings t.header
     let cookie t = M.bindings t.cookie
+
+    let schemas t : schema list =
+      [ path t |> List.map (fun (_, p) -> p.schema)
+      ; query t |> List.map (fun (_, p) -> p.schema)
+      ; header t |> List.map (fun (_, p) -> p.schema)
+      ; cookie t |> List.map (fun (_, p) -> p.schema)
+      ]
+      |> List.flatten
   end
 
   let deref : 'a O.or_ref -> 'a = function
@@ -99,13 +175,13 @@ module Message = struct
 
   module Request = struct
     type content =
-      { media_type : string
-      ; required : bool
-      ; schema : O.schema
+      { required : bool
+      ; schema : schema
       }
 
     type t =
-      { params : Params.t
+      { id : string
+      ; params : Params.t
       ; path : O.Openapi_path.t (* Locator *)
       ; meth : Http.Method.t
       ; content : content option (* Representation (if applicable) *)
@@ -120,6 +196,10 @@ module Message = struct
         |> List.map deref
         |> Params.of_openapi path_params
       in
+      let id =
+        oper.operationId
+        |> get ~msg:"Oooapi requires operations to have an operationId"
+      in
       let content =
         match oper.requestBody with
         | None -> None
@@ -129,7 +209,15 @@ module Message = struct
             | [] -> None
             | (media_type, c) :: _ ->
             match c.schema with
-            | Some schema -> Some { media_type; schema; required }
+            | Some schema ->
+                let kind = kind_of_media_type media_type in
+                let name =
+                  match schema.name with
+                  | Some n -> n
+                  | None -> id ^ "_request"
+                in
+                let schema = { kind; name; schema } in
+                Some { schema; required }
             | None ->
                 failwith
                   (Printf.sprintf
@@ -137,21 +225,16 @@ module Message = struct
                       OpenAPI allow this?"
                      media_type))
       in
-      { params; path; meth; content }
+      { id; params; path; meth; content }
   end
 
   (* TODO: Support different status returns? E.g. via [`200 (of_data data)] *)
   module Responses = struct
-    type content =
-      { schema : O.schema
-      ; media_type : string
-      }
+    type t = (Http.Status.t * schema) list
 
-    type t = (Http.Status.t * content) list
-
-    let of_responses : (string * O.response) list -> t =
-     fun resps ->
-      resps
+    let of_responses : O.operation -> t =
+     fun oper ->
+      oper.responses
       |> List.map (fun (code, (resp : O.response)) ->
              let status =
                match
@@ -175,18 +258,36 @@ module Message = struct
                            code))
                | Some ((media_type, c) :: _) ->
                match c.schema with
-               | Some schema -> { media_type; schema }
                | None ->
                    failwith
                      (Printf.sprintf
                         "Request body with media type %s has no schema. Why \
                          does OpenAPI allow this?"
                         media_type)
+               | Some schema ->
+                   let kind = kind_of_media_type media_type in
+                   let name =
+                     match schema.name with
+                     | Some n -> n
+                     | None ->
+                         let op_id =
+                           oper.operationId
+                           |> get
+                                ~msg:
+                                  "Oooapi expects operations to have an \
+                                   operationId"
+                         in
+                         op_id ^ "_response"
+                   in
+                   { kind; name; schema }
              in
              (status, response))
   end
 
-  type t = Request.t * Responses.t
+  type t =
+    { req : Request.t
+    ; resp : Responses.t
+    }
 
   let of_openapi_path : O.Openapi_path.t * O.path_item -> t list =
    fun (path, item) ->
@@ -200,47 +301,87 @@ module Message = struct
       Fun.id
       [ item.get
         |> Option.map (fun p ->
-               ( Request.of_operation path `GET path_params p
-               , Responses.of_responses p.responses ))
+               { req = Request.of_operation path `GET path_params p
+               ; resp = Responses.of_responses p
+               })
       ; item.put
         |> Option.map (fun p ->
-               ( Request.of_operation path `PUT path_params p
-               , Responses.of_responses p.responses ))
+               { req = Request.of_operation path `PUT path_params p
+               ; resp = Responses.of_responses p
+               })
       ; item.post
         |> Option.map (fun p ->
-               ( Request.of_operation path `POST path_params p
-               , Responses.of_responses p.responses ))
+               { req = Request.of_operation path `POST path_params p
+               ; resp = Responses.of_responses p
+               })
       ; item.delete
         |> Option.map (fun p ->
-               ( Request.of_operation path `DELETE path_params p
-               , Responses.of_responses p.responses ))
+               { req = Request.of_operation path `DELETE path_params p
+               ; resp = Responses.of_responses p
+               })
       ; item.options
         |> Option.map (fun p ->
-               ( Request.of_operation path `OPTIONS path_params p
-               , Responses.of_responses p.responses ))
+               { req = Request.of_operation path `OPTIONS path_params p
+               ; resp = Responses.of_responses p
+               })
       ; item.head
         |> Option.map (fun p ->
-               ( Request.of_operation path `HEAD path_params p
-               , Responses.of_responses p.responses ))
+               { req = Request.of_operation path `HEAD path_params p
+               ; resp = Responses.of_responses p
+               })
       ; item.patch
         |> Option.map (fun p ->
-               ( Request.of_operation path `PATCH path_params p
-               , Responses.of_responses p.responses ))
+               { req = Request.of_operation path `PATCH path_params p
+               ; resp = Responses.of_responses p
+               })
       ; item.trace
         |> Option.map (fun p ->
-               ( Request.of_operation path `TRACE path_params p
-               , Responses.of_responses p.responses ))
+               { req = Request.of_operation path `TRACE path_params p
+               ; resp = Responses.of_responses p
+               })
       ]
 end
 
+(* Mapping schema names to schemas *)
+type schemata = schema SM.t
+
 type t =
-  { base_url : string
+  { title : string
+  ; version : string
+  ; base_url : string
   ; messages : Message.t list
+  ; schemata : schemata
   }
 
+(* TODO: doc why:  we only know what schema we'll actually need after relevant operations are constructed. As per spec  *)
+(* CLEAN UP *)
+let add_msg_schema : schemata -> Message.t -> schemata =
+ fun schemata msg ->
+  let schemas : schema list =
+    (msg.req.content
+    |> Option.fold ~none:[] ~some:(fun (c : Message.Request.content) ->
+           [ c.schema ]))
+    @ Message.Params.schemas msg.req.params
+    @ (msg.resp |> List.map snd)
+  in
+  schemas
+  |> ListLabels.fold_left ~init:schemata ~f:(fun ss s -> SM.add s.name s ss)
+
+let open_api_major_version s : int =
+  Option.value ~default:0
+  @@
+  match String.split_on_char '.' s with
+  | n :: _ -> int_of_string_opt n
+  | _ -> None
+
 let of_openapi_spec : Openapi_spec.t -> t =
- fun s ->
-  let s = O.resolve_refs s in
+ fun spec ->
+  let ({ version; title; _ } : O.info) = spec.info in
+  if not (open_api_major_version spec.openapi >= 3) then
+    failwith
+      ("Required OpenAPI version 3 or later, spec is for version "
+      ^ spec.openapi);
+  let s = O.resolve_refs spec in
   let base_url =
     match s.servers with
     | [] ->
@@ -253,5 +394,28 @@ let of_openapi_spec : Openapi_spec.t -> t =
            What should we do if there are multiple servers? *)
         s.url
   in
-  let messages = List.concat_map Message.of_openapi_path s.paths in
-  { base_url; messages }
+  let schemata, messages =
+    s.paths
+    |> ListLabels.fold_left
+         ~init:(SM.empty, [])
+         ~f:(fun (schemata, paths) path ->
+           let msgs = Message.of_openapi_path path in
+           let scm =
+             ListLabels.fold_left ~init:schemata ~f:add_msg_schema msgs
+           in
+           (scm, msgs @ paths))
+  in
+  let schemata =
+    match spec.components with
+    | None -> schemata
+    | Some { schemas; _ } ->
+        schemas
+        |> ListLabels.fold_left
+             ~init:schemata
+             ~f:(fun schemata (name, schema) ->
+               schemata
+               |> SM.update name (function
+                      | None -> Some { name; schema; kind = `Json }
+                      | Some s -> Some s))
+  in
+  { version; title; base_url; messages; schemata }

@@ -76,6 +76,28 @@ let dereferenced_path_item : components -> path_item -> path_item =
   | { ref_ = Some ref'; _ } ->
       with_obj_of_ref ref' components.pathItems ~section:"pathItems" ~f:Fun.id
 
+let dereference_schema : components -> schema -> schema =
+ fun components schema ->
+  match ((Json_schema.root schema.schema).kind : Json_schema.element_kind) with
+  (* TODO Do we also need to handle Id_ref? *)
+  | Def_ref ref' ->
+      (* TODO: Is there a better way to derive this? *)
+      let ref' = "#" ^ Json_query.json_pointer_of_path ref' in
+      with_obj_of_ref ref' components.schemas ~section:"schemas" ~f:(fun s ->
+          let name = get_name_of_ref ref' in
+          { s with
+            (* The name is the schema key *)
+            (* TODO Should we be adding these names during deserialization? *)
+            name = Some name
+          })
+  | _ -> schema
+
+let dereferenced_media_type : components -> media_type -> media_type =
+ fun components media ->
+  match media.schema with
+  | None -> media
+  | Some s -> { media with schema = Some (dereference_schema components s) }
+
 let dereferenced_parameters =
   let dereferenced_parameter :
       components -> parameter or_ref -> parameter or_ref =
@@ -87,29 +109,30 @@ let dereferenced_parameters =
           r.ref_
           components.parameters
           ~section:"parameters"
-          ~f:(fun x -> `Obj x)
+          ~f:(fun p ->
+            let resolved =
+              match p.schema with
+              | Some s ->
+                  { p with schema = Some (dereference_schema components s) }
+              | None ->
+              match p.content with
+              | None
+              | Some [] ->
+                  failwith "TODO Invalid spec: param without schema or content"
+              | Some (_ :: _ :: _) ->
+                  failwith "TODO Invalid spec: only one entry allowed"
+              | Some [ (media_type, media) ] ->
+                  { p with
+                    content =
+                      Some
+                        [ (media_type, dereferenced_media_type components media)
+                        ]
+                  }
+            in
+            `Obj resolved)
   in
   fun components params ->
     Option.map (List.map @@ dereferenced_parameter components) params
-
-let dereferenced_media_type : components -> media_type -> media_type =
- fun components media ->
-  match media.schema with
-  | None -> media
-  | Some s ->
-  match ((Json_schema.root s.schema).kind : Json_schema.element_kind) with
-  | Id_ref ref' ->
-      with_obj_of_ref ref' components.schemas ~section:"schemas" ~f:(fun s ->
-          { media with
-            schema =
-              Some
-                { s with
-                  (* The name is the schema key *)
-                  (* TODO Should we be adding these names during deserialization? *)
-                  name = Some (get_name_of_ref ref')
-                }
-          })
-  | _ -> media
 
 let dereferenced_request_body :
     components -> request_body or_ref option -> request_body or_ref option =

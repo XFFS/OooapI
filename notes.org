@@ -4,6 +4,7 @@
 
 For constructing OCaml
  https://ocaml-ppx.github.io/ppxlib/ppxlib/generating-code.html#metaquot
+
 * Notes
 
 ** To convert an OpenAPI spec from yaml to json
@@ -16,8 +17,11 @@ yq < ./thespec.yaml > ./thespec.json
 * Tasks
 ** DONE Map OpenAPI to a more sensible data structure
 *** Reuse Cohttp's =http= types as much as possible.
-** TODO Add tests for http_spec mapping
 ** TODO Automate conversion of yaml to json for specs, via yq
+** TODO Every schema needs a (ideally unique) name
+- If in "schemas", the name is the schema key
+- Otherwise it is derived from its location
+** TODO Move multipart forms into data object
 ** TODO Content conversion
 https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
 ** TODO Support url encoded forms

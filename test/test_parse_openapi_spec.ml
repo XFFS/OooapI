@@ -2,6 +2,41 @@ open Tezt
 open Tezt.Base
 module O = Openapi_spec
 
+(* TEST HELPERS *)
+
+(* A schema that is a ref *)
+let ref_schema ref' : O.schema =
+  let trimmed = String.sub ref' 1 (String.length ref' - 1) in
+  let path = Json_query.path_of_json_pointer trimmed in
+  { name = None
+  ; schema =
+      Json_schema.(
+        create
+          { kind = Def_ref path
+          ; title = Some "Ref schema"
+          ; description = None
+          ; default = None
+          ; enum = None
+          ; id = None
+          ; format = None
+          })
+  }
+
+let dummy_schema_type : O.schema =
+  { name = None
+  ; schema =
+      Json_schema.(
+        create
+          { kind = Boolean
+          ; title = Some "Test schema"
+          ; description = None
+          ; default = None
+          ; enum = None
+          ; id = None
+          ; format = None
+          })
+  }
+
 let test ?(tags = [ "openapi_spec" ]) title f =
   Test.register ~__FILE__ ~title ~tags f
 ;;
@@ -164,8 +199,9 @@ let spec =
 ;;
 
 test "can resolve path parameter references" @@ fun () ->
-let path = [ `C "foo" ] in
+let path = [ `C "bar"; `P "foo" ] in
 let name = "fooParam" in
+let schema_name = "fooSchema" in
 let spec : O.t =
   spec
     ~paths:
@@ -176,8 +212,16 @@ let spec : O.t =
       ]
     ~components:
       (O.create_components
-         ~parameters:[ (name, O.create_parameter ~name ~in_:`Path ()) ]
-         ())
+         ()
+         ~parameters:
+           [ ( name
+             , O.create_parameter
+                 ~name
+                 ~in_:`Path
+                 ~schema:(ref_schema ("#/components/schemas/" ^ schema_name))
+                 () )
+           ]
+         ~schemas:[ (schema_name, dummy_schema_type) ])
     ()
 in
 let resolved_spec = Openapi_spec.resolve_refs spec in
@@ -187,6 +231,13 @@ match (List.assoc path resolved_spec.paths).parameters with
       (param.name = name)
         string
         ~error_msg:"Expected parameter reference to be resolved");
+    Check.(
+      match param.schema with
+      | None -> Test.fail "Param somehow lost its schema"
+      | Some s ->
+          Check.(s.name = Some schema_name)
+            (option string)
+            ~error_msg:"Expected param schema reference to be resolved");
     unit
 | _ -> Test.fail "Expected parameter was not found"
 ;;
@@ -207,7 +258,14 @@ let spec : O.t =
       ]
     ~components:
       (O.create_components
-         ~parameters:[ (name, O.create_parameter () ~name ~in_:`Header) ]
+         ~parameters:
+           [ ( name
+             , O.create_parameter
+                 ()
+                 ~name
+                 ~in_:`Header
+                 ~schema:dummy_schema_type )
+           ]
          ())
     ()
 in
@@ -263,37 +321,6 @@ with
         ~error_msg:"Expected reference to be resolved");
     unit
 | _ -> Test.fail "Expected object was not found"
-
-(* A schema thta is a ref *)
-let ref_schema ref' : O.schema =
-  { name = None
-  ; schema =
-      Json_schema.(
-        create
-          { kind = Id_ref ref'
-          ; title = None
-          ; description = None
-          ; default = None
-          ; enum = None
-          ; id = None
-          ; format = None
-          })
-  }
-
-let dummy_schema_type : O.schema =
-  { name = None
-  ; schema =
-      Json_schema.(
-        create
-          { kind = Boolean
-          ; title = Some "Test schema"
-          ; description = None
-          ; default = None
-          ; enum = None
-          ; id = None
-          ; format = None
-          })
-  }
 ;;
 
 test "can resolve request body content references" @@ fun () ->

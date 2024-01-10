@@ -3,6 +3,7 @@ open AstUtil
 
 (* re-exported just for testing *)
 module DAG = DAG
+module H = Http_spec
 
 module DataModule = struct
   (* TODO Account for constraints, like pattern, min/max format etc.?
@@ -219,12 +220,12 @@ module DataModule = struct
     gather_declarations ~type_name:"t" root;
     !declarations
 
-  let data_module_of_schema_entry :
-      string * Openapi_spec.schema -> structure_item =
+  let data_module_of_schema_entry : string * Http_spec.schema -> structure_item
+      =
    fun (name, schema) ->
     let name = n (Some (Camelsnakekebab.upper_camel_case name)) in
     let type_declarations =
-      [ Ast.pstr_type Recursive (type_declarations_of_schema schema) ]
+      [ Ast.pstr_type Recursive (type_declarations_of_schema schema.schema) ]
     in
     let expr = Ast.pmod_structure type_declarations in
     Ast.module_binding ~name ~expr |> Ast.pstr_module
@@ -264,24 +265,20 @@ module DataModule = struct
   (* The DAG is used for dependency analysis *)
   module Graph = DAG.Make (String)
 
-  let of_components (components : Openapi_spec.components option) =
+  let of_schemata (schemata : Http_spec.schemata) =
     let name = Ast.Located.mk (Some "Data") in
     let expr =
+      let schemata = Http_spec.SM.bindings schemata in
       let structure_items =
-        let schemas =
-          match components with
-          | None -> []
-          | Some c -> c.schemas
-        in
         let dep_ordering =
           let dep_graph =
             (* Build a dependency graph of each component *)
-            schemas
+            schemata
             |> ListLabels.fold_left
                  ~init:Graph.empty
-                 ~f:(fun graph (src, (s : Openapi_spec.schema)) ->
+                 ~f:(fun graph (src, (s : Http_spec.schema)) ->
                    (* Add each schema and its deps to the graph *)
-                   let deps = schema_deps s.schema in
+                   let deps = schema_deps s.schema.schema in
                    Graph.add_arcs ~src deps graph)
           in
           let sorted_rev = Graph.topological_sort dep_graph in
@@ -289,7 +286,12 @@ module DataModule = struct
         in
         dep_ordering
         |> List.map (fun label ->
-               data_module_of_schema_entry (label, List.assoc label schemas))
+               match List.assoc_opt label schemata with
+               | Some s -> data_module_of_schema_entry (label, s)
+               | None ->
+                   failwith
+                     ("TODO: No schema provided for reference in other schema "
+                     ^ label))
       in
       Ast.pmod_structure structure_items
     in
@@ -418,61 +420,58 @@ module EndpointsModule = struct
       in
       { name; var; pat; optional; default; to_string; format }
 
-    let of_openapi_parameter : Openapi_spec.parameter -> param =
-     fun p ->
-      let var = Ast.evar p.name in
-      let pat = Ast.pvar p.name in
+    let of_http_spec_param : string * H.Message.Params.param -> param =
+     fun (name, p) ->
+      let var = Ast.evar name in
+      let pat = Ast.pvar name in
       let optional = not p.required in
       let default, to_string =
-        match p.schema with
-        (* TODO should this be an error? Or is defaulting to string right? *)
-        | None -> (None, var)
-        | Some s ->
-            let to_string, typ =
-              match DataModule.type_declarations_of_schema s with
-              | [] -> failwith ("no schema specified for parameter " ^ p.name)
-              | _ :: _ :: _ ->
-                  failwith ("multiple schemas specified for parameter " ^ p.name)
-              | [ typ_decl ] ->
-              match typ_decl.ptype_manifest with
-              | None -> failwith ("unsupported type for parameter " ^ p.name)
-              | Some t ->
-              match t with
-              | [%type: string] -> ([%expr fun x -> x], t)
-              | [%type: bool] -> ([%expr string_of_bool], t)
-              | [%type: int] -> ([%expr string_of_int], t)
-              | [%type: float] -> ([%expr string_of_float], t)
-              | unsupported_typ ->
-                  failwith
-                    (Printf.sprintf
-                       "parmamters of type %s not supported for param %s"
-                       (string_of_core_type unsupported_typ)
-                       p.name)
-            in
-            let default =
-              (Json_schema.root s.schema).default
-              |> Option.map (Json_repr.any_to_repr (module Json_repr.Yojson))
-              |> Option.map (function
-                     | `String s -> Ast.estring s
-                     | `Bool b -> Ast.ebool b
-                     | `Int i -> (
-                         (* JS doesn't distinguish between `Number` "types", so we have be sure we
-                            decode the default correctly in case it is given in an integral form when
-                            it should be a float. *)
-                         match typ with
-                         | [%type: float] ->
-                             Ast.efloat (string_of_float (float_of_int i))
-                         | _ -> Ast.eint i)
-                     | `Float f -> Ast.efloat (string_of_float f)
-                     | unsupported_default ->
-                         failwith
-                           (Printf.sprintf
-                              "default parmamters value %s not supported for \
-                               param %s"
-                              (Yojson.Safe.to_string unsupported_default)
-                              p.name))
-            in
-            (default, to_string)
+        let s = p.schema.schema in
+        let to_string, typ =
+          match DataModule.type_declarations_of_schema s with
+          | [] -> failwith ("no schema specified for parameter " ^ name)
+          | _ :: _ :: _ ->
+              failwith ("multiple schemas specified for parameter " ^ name)
+          | [ typ_decl ] ->
+          match typ_decl.ptype_manifest with
+          | None -> failwith ("unsupported type for parameter " ^ name)
+          | Some t ->
+          match t with
+          | [%type: string] -> ([%expr fun x -> x], t)
+          | [%type: bool] -> ([%expr string_of_bool], t)
+          | [%type: int] -> ([%expr string_of_int], t)
+          | [%type: float] -> ([%expr string_of_float], t)
+          | unsupported_typ ->
+              failwith
+                (Printf.sprintf
+                   "parmamters of type %s not supported for param %s"
+                   (string_of_core_type unsupported_typ)
+                   name)
+        in
+        let default =
+          (Json_schema.root s.schema).default
+          |> Option.map (Json_repr.any_to_repr (module Json_repr.Yojson))
+          |> Option.map (function
+                 | `String s -> Ast.estring s
+                 | `Bool b -> Ast.ebool b
+                 | `Int i -> (
+                     (* JS doesn't distinguish between `Number` "types", so we have be sure we
+                        decode the default correctly in case it is given in an integral form when
+                        it should be a float. *)
+                     match typ with
+                     | [%type: float] ->
+                         Ast.efloat (string_of_float (float_of_int i))
+                     | _ -> Ast.eint i)
+                 | `Float f -> Ast.efloat (string_of_float f)
+                 | unsupported_default ->
+                     failwith
+                       (Printf.sprintf
+                          "default parmamters value %s not supported for param \
+                           %s"
+                          (Yojson.Safe.to_string unsupported_default)
+                          name))
+        in
+        (default, to_string)
       in
       let default =
         if not optional then
@@ -480,47 +479,52 @@ module EndpointsModule = struct
         else
           default
       in
-      { name = p.name; optional; default; to_string; var; pat; format = None }
+      { name; optional; default; to_string; var; pat; format = None }
 
-    let of_openapi_parameters :
-        Openapi_spec.parameter Openapi_spec.or_ref list option -> t =
+    let of_openapi_parameters : Http_spec.Message.Params.t -> t =
      fun params ->
-      match params with
-      | None -> empty
-      | Some ps ->
-          ps
-          |> ListLabels.fold_right
-               ~init:{ query = []; path = []; header = []; form = [] }
-               ~f:(fun i acc ->
-                 match i with
-                 | `Ref (r : Openapi_spec.reference) ->
-                     failwith
-                       (Printf.sprintf
-                          "references not yet supported for params, given \
-                           param ref %s"
-                          r.ref_)
-                 | `Obj (p : Openapi_spec.parameter) ->
-                 match p.in_ with
-                 | `Query ->
-                     { acc with query = of_openapi_parameter p :: acc.query }
-                 | `Path ->
-                     { acc with path = of_openapi_parameter p :: acc.path }
-                 | `Header ->
-                     { acc with header = of_openapi_parameter p :: acc.header }
-                 | `Cookie ->
-                     (* TODO *)
-                     failwith "unsupported parameter location 'cookie")
+      let module P = H.Message.Params in
+      { query = P.query params |> List.map of_http_spec_param
+      ; path = P.path params |> List.map of_http_spec_param
+      ; header = P.header params |> List.map of_http_spec_param
+      ; form =
+          P.cookie params |> List.map of_http_spec_param
+          (* TODO! Move this into data object! *)
+          (* ; cookie = P.cookie params |> List.map of_http_spec_param   *)
+      }
+
+    (* match params with *)
+    (* | None -> empty *)
+    (* | Some ps -> *)
+    (*     ps *)
+    (*     |> ListLabels.fold_right *)
+    (*          ~init:{ query = []; path = []; header = []; form = [] } *)
+    (*          ~f:(fun i acc -> *)
+    (*            match i with *)
+    (*            | `Ref (r : Openapi_spec.reference) -> *)
+    (*                failwith *)
+    (*                  (Printf.sprintf *)
+    (* "references not yet supported for params, given \ *)
+       (*                      param ref %s" *)
+    (*                     r.ref_) *)
+    (*            | `Obj (p : Openapi_spec.parameter) -> *)
+    (*            match p.in_ with *)
+    (*            | `Query -> *)
+    (*                { acc with query = of_openapi_parameter p :: acc.query } *)
+    (*            | `Path -> *)
+    (*                { acc with path = of_openapi_parameter p :: acc.path } *)
+    (*            | `Header -> *)
+    (*                { acc with header = of_openapi_parameter p :: acc.header } *)
+    (*            | `Cookie -> *)
+    (*                (\* TODO *\) *)
+    (*                failwith "unsupported parameter location 'cookie") *)
   end
 
   type operation_function =
     Openapi_spec.path -> Openapi_spec.operation -> structure_item
 
-  let operation_function_name (operation : Openapi_spec.operation) path =
-    operation.operationId
-    |> Option.value ~default:(Openapi_spec.Openapi_path.to_string path)
-       (* TODO fail in missing id? *)
-    |> AstExt.to_identifier
-    |> AstExt.Pat.var
+  let operation_function_name operation_id =
+    operation_id |> AstExt.to_identifier |> AstExt.Pat.var
 
   let data_module_fun_name name f = Printf.sprintf "Data.%s.%s" name f
 
@@ -528,28 +532,21 @@ module EndpointsModule = struct
     let mod_name = Camelsnakekebab.upper_camel_case mod_name in
     Ast.evar (data_module_fun_name mod_name "to_yojson")
 
-  let response_decoder (responses : (string * Openapi_spec.response) list) :
-      expression =
+  let response_decoder (responses : H.Message.Responses.t) : expression =
     (* TODO What to do with this unsupported thing? *)
-    let unsupported = [%expr fun x -> Ok x] in
-    match responses |> List.assoc_opt "200" with
+    match responses |> List.assoc_opt `OK with
     | None ->
         (* TODO This is only required if it is the ONLY response. So need to account for others *)
         (* https://spec.openapis.org/oas/v3.1.0#responses-object *)
         raise (Invalid_data "Invalid schema: no 200 response")
-    | Some r ->
-    match Option.bind r.content (List.assoc_opt "application/json") with
-    | None -> unsupported
-    | Some m ->
-    match m.schema with
-    | None -> unsupported
-    | Some s ->
-    match (Json_schema.root s.schema).kind with
-    | Def_ref p ->
-        let mod_name = DataModule.module_name_of_def_ref p in
+    | Some schema ->
+    match schema.kind with
+    | `Json ->
+        let mod_name = Camelsnakekebab.upper_camel_case schema.name in
         let conv_fun = Ast.evar (data_module_fun_name mod_name "of_yojson") in
         [%expr of_json_string [%e conv_fun]]
-    | _ -> unsupported
+    | `Html -> [%expr fun x -> x]
+    | `Multipart_form -> raise (Failure "TODO")
 
   let path_parts path : expression =
     path
@@ -622,36 +619,15 @@ module EndpointsModule = struct
     | Def_ref path -> Some (DataModule.json_query_path_terminal path)
     | _ -> None
 
-  let data_conv_and_param ?(name = "<no operation id>") :
-         Openapi_spec.components
-      -> Openapi_spec.request_body Openapi_spec.or_ref option
-      -> expression * pattern * Params.param list =
-    let from_json = function
-      | None -> failwith ("Content type is missing schema: " ^ name)
-      | Some (s : Openapi_spec.schema) ->
-      match ref_of_schema s.schema with
-      | None -> failwith ("only Ref_def supported for Json currently :" ^ name)
-      | Some schema_name ->
-          ( [%expr Some (`Json ([%e to_json_fun schema_name] data))]
-          , [%pat? data]
-          , [] )
-    and from_multipart (components : Openapi_spec.components) = function
-      | None -> failwith ("Content type is missing schema: " ^ name)
-      | Some (s : Openapi_spec.schema) ->
-      match ref_of_schema s.schema with
-      | None ->
-          failwith
-            ("only Ref_def supported for multipart forms currently :" ^ name)
-      | Some schema_name ->
-      match List.assoc_opt schema_name components.schemas with
-      | None ->
-          failwith
-            ("no schema exists for "
-            ^ schema_name
-            ^ " referenced in operation "
-            ^ name)
-      | Some form_data_schema ->
-      match Json_schema.(root form_data_schema.schema).kind with
+  let data_conv_and_param :
+      H.Message.Request.t -> expression * pattern * Params.param list =
+    let from_json (schema : H.schema) =
+      ( [%expr Some (`Json ([%e to_json_fun schema.name] data))]
+      , [%pat? data]
+      , [] )
+    and from_multipart (schema : H.schema) =
+      (* TODO hella awkward schema.schema.schema, lol -- need to rename *)
+      match (Json_schema.root schema.schema.schema).kind with
       | Object { properties; _ } ->
           let params =
             properties
@@ -664,65 +640,77 @@ module EndpointsModule = struct
       | _ ->
           raise (Invalid_argument "non object as input for multipart form data")
     in
-    fun components request_body ->
-      match request_body with
+    fun req ->
+      match req.content with
       | None -> ([%expr None], [%pat? ()], [])
-      | Some body ->
-      match body with
-      | `Ref r ->
-          ([%expr Some (`Json ([%e to_json_fun r.ref_] data))], [%pat? data], [])
-      | `Obj o ->
-      match List.assoc_opt "application/json" o.content with
-      | Some media_type -> from_json media_type.schema
-      | None ->
-      match List.assoc_opt "multipart/form-data" o.content with
-      | Some media_type -> from_multipart components media_type.schema
-      | None ->
-          failwith
-            ("unsupported request body (only JSON and multipart form data)"
-            ^ name)
+      | Some { schema; _ } ->
+      match schema.kind with
+      | `Json -> from_json schema
+      | `Multipart_form -> from_multipart schema
+      | `Html -> raise (Failure "TODO")
 
-  (** A function to make a get request *)
-  let get_fun : operation_function =
-   fun path operation ->
-    let name = operation_function_name operation path in
-    let params = Params.of_openapi_parameters operation.parameters in
-    let decode_resp = response_decoder operation.responses in
-    let body =
-      [%expr
-        make_request
-          ~base_url
-          ~path:[%e path_parts path]
-          ~params:[%e query_params params.query]
-          ~headers:[%e extra_headers params.header]
-          ~decode:[%e decode_resp]
-          `GET]
-    in
+  (* (\** A function to make a get request *\) *)
+  (* let get_fun : operation_function = *)
+  (*  fun path operation -> *)
+  (*   let name = operation_function_name operation path in *)
+  (*   let params = Params.of_openapi_parameters operation.parameters in *)
+  (*   let decode_resp = response_decoder operation.responses in *)
+  (*   let body = *)
+  (*     [%expr *)
+  (*       make_request *)
+  (*         ~base_url *)
+  (*         ~path:[%e path_parts path] *)
+  (*         ~params:[%e query_params params.query] *)
+  (*         ~headers:[%e extra_headers params.header] *)
+  (*         ~decode:[%e decode_resp] *)
+  (*         `GET] *)
+  (*   in *)
 
-    (* TODO We are missing the path parameters supplied by reference here! Why?
-              We seem to be totally ignoring the params?
+  (*   (\* TODO We are missing the path parameters supplied by reference here! Why? *)
+  (*             We seem to be totally ignoring the params? *)
 
-       NOTE: The problem is that parameters can be specified in two different place: at the path level, and at the override level.*)
-    [%stri let [%p name] = [%e fun_with_params ~data:Ast.punit params body]]
+  (*      NOTE: The problem is that parameters can be specified in two different place: at the path level, and at the override level.*\) *)
+  (*   [%stri let [%p name] = [%e fun_with_params ~data:Ast.punit params body]] *)
 
-  let post_fun : Openapi_spec.components -> operation_function =
-   fun components path operation ->
-    let name = operation_function_name operation path in
-    let params = Params.of_openapi_parameters operation.parameters in
-    let data_conv, data_param, form_params =
-      data_conv_and_param
-        ?name:operation.operationId
-        components
-        operation.requestBody
-    in
+  (* let post_fun : Openapi_spec.components -> operation_function = *)
+  (*  fun components path operation -> *)
+  (*   let name = operation_function_name operation path in *)
+  (*   let params = Params.of_openapi_parameters operation.parameters in *)
+  (*   let data_conv, data_param, form_params = *)
+  (*     data_conv_and_param *)
+  (*       ?name:operation.operationId *)
+  (*       components *)
+  (*       operation.requestBody *)
+  (*   in *)
+  (*   let params = { params with form = form_params } in *)
+  (*   let decode_resp = response_decoder operation.responses in *)
+  (*   let body = *)
+  (*     [%expr *)
+  (*       make_request *)
+  (*         ?data:[%e data_conv] *)
+  (*         ~base_url *)
+  (*         ~path:[%e path_parts path] *)
+  (*         ~params:[%e query_params params.query] *)
+  (*         ~headers:[%e extra_headers params.header] *)
+  (*         ~decode:[%e decode_resp] *)
+  (*         `POST] *)
+  (*   in *)
+  (*   [%stri let [%p name] = [%e fun_with_params ~data:data_param params body]] *)
+
+  (* TODO rename to operation_fun? *)
+  let endpoint : Http_spec.Message.t -> structure_item =
+   fun message ->
+    let name = operation_function_name message.req.id in
+    let params = Params.of_openapi_parameters message.req.params in
+    let data_conv, data_param, form_params = data_conv_and_param message.req in
     let params = { params with form = form_params } in
-    let decode_resp = response_decoder operation.responses in
+    let decode_resp = response_decoder message.resp in
     let body =
       [%expr
         make_request
           ?data:[%e data_conv]
           ~base_url
-          ~path:[%e path_parts path]
+          ~path:[%e path_parts message.req.path]
           ~params:[%e query_params params.query]
           ~headers:[%e extra_headers params.header]
           ~decode:[%e decode_resp]
@@ -730,23 +718,14 @@ module EndpointsModule = struct
     in
     [%stri let [%p name] = [%e fun_with_params ~data:data_param params body]]
 
-  let endpoint :
-         Openapi_spec.components
-      -> Openapi_spec.path * Openapi_spec.path_item
-      -> structure_item list =
-   fun components (path, path_item) ->
-    [ (get_fun path, path_item.get)
-    ; (post_fun components path, path_item.post)
-    ]
-    |> List.filter_map (fun (f, operation) -> Option.map f operation)
+  (* [ (get_fun path, path_item.get) *)
+  (* ; (post_fun components path, path_item.post) *)
+  (* ] *)
+  (* |> List.filter_map (fun (f, operation) -> Option.map f operation) *)
 
   (** Construct the AST node of the module with all endpoint functions *)
-  let of_paths :
-         Openapi_spec.components option
-      -> string
-      -> Openapi_spec.paths
-      -> structure_item list =
-   fun components base_url endpoints ->
+  let of_messages : Http_spec.Message.t list -> string -> structure_item list =
+   fun messages base_url ->
     let endpoint_functor =
       let endpoint_functor_param =
         Named
@@ -760,12 +739,7 @@ module EndpointsModule = struct
       in
       let mod_impl =
         let decls = [ [%stri open Oooapi_lib.Cohttp_client (Config)] ] in
-        let endpoint_functions =
-          match components with
-          | Some components ->
-              endpoints |> List.map (endpoint components) |> List.flatten
-          | None -> []
-        in
+        let endpoint_functions = messages |> List.map endpoint in
         Ast.pmod_structure (decls @ endpoint_functions)
       in
       Ast.pmod_functor endpoint_functor_param
@@ -797,35 +771,11 @@ let notice () =
     tm_min
     tm_sec
 
-let open_api_major_version s : int =
-  Option.value ~default:0
-  @@
-  match String.split_on_char '.' s with
-  | n :: _ -> int_of_string_opt n
-  | _ -> None
-
 let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
  fun spec ->
-  (* TODO support for other versions? *)
-  if not (open_api_major_version spec.openapi >= 3) then
-    failwith
-      ("Required OpenAPI version 3 or later, spec is for version "
-      ^ spec.openapi);
-
-  let base_url =
-    match spec.servers with
-    | [] ->
-        (* https://spec.openapis.org/oas/v3.1.0#openapi-object
-           > If the servers property is not provided, or is an empty array, the
-           default value would be a Server Object with a url value of /. *)
-        "/"
-    | s :: _ ->
-        (* NOTE: Currently we are just using the first server.
-           What should we do if there are multiple servers? *)
-        s.url
-  in
+  let spec = Http_spec.of_openapi_spec spec in
   [%stri let __NOTE__ = [%e Ast.estring (notice ())]]
-  :: [%stri let __TITLE__ = [%e Ast.estring spec.info.title]]
-  :: [%stri let __API_VERSION__ = [%e Ast.estring spec.info.version]]
-  :: DataModule.of_components spec.components
-  :: EndpointsModule.of_paths spec.components base_url spec.paths
+  :: [%stri let __TITLE__ = [%e Ast.estring spec.title]]
+  :: [%stri let __API_VERSION__ = [%e Ast.estring spec.version]]
+  :: DataModule.of_schemata spec.schemata
+  :: EndpointsModule.of_messages spec.messages spec.base_url
