@@ -151,10 +151,10 @@ module DataModule = struct
       =
    fun (name, schema) ->
     let name = n (Some (Camelsnakekebab.upper_camel_case name)) in
-    (* TODO: NEXT add generation of "to_multipart" *)
     let type_declarations =
       [ Ast.pstr_type Recursive (type_declarations_of_schema schema.schema) ]
     in
+    (* TODO: NEXT add generation of "to_multipart" *)
     let to_multipart = match schema.kind with
       | `Multipart_form -> []
       | _ -> []
@@ -341,36 +341,32 @@ module EndpointsModule = struct
       in
       { name; var; pat; optional; default; to_string; format }
 
+    (* TODO: Needs cleanup *)
     let of_http_spec_param : string * H.Message.Params.param -> param =
      fun (name, p) ->
       let var = Ast.evar name in
       let pat = Ast.pvar name in
       let optional = not p.required in
       let default, to_string =
-        let s = p.schema.schema in
+        let schema = p.schema.schema.schema in
+        let elem = Json_schema.root schema in
         let to_string, typ =
-          match DataModule.type_declarations_of_schema s with
-          | [] -> failwith ("no schema specified for parameter " ^ name)
-          | _ :: _ :: _ ->
-              failwith ("multiple schemas specified for parameter " ^ name)
-          | [ typ_decl ] -> (
-              match typ_decl.ptype_manifest with
-              | None -> failwith ("unsupported type for parameter " ^ name)
-              | Some t -> (
-                  match t with
-                  | [%type: string] -> ([%expr fun x -> x], t)
-                  | [%type: bool] -> ([%expr string_of_bool], t)
-                  | [%type: int] -> ([%expr string_of_int], t)
-                  | [%type: float] -> ([%expr string_of_float], t)
-                  | unsupported_typ ->
-                      failwith
-                        (Printf.sprintf
-                           "parmamters of type %s not supported for param %s"
-                           (string_of_core_type unsupported_typ)
-                           name)))
+          let t = DataModule.type_of_element ~qualifier:"N/A" elem |> fst in
+          match t with
+          | [%type: string] -> ([%expr fun x -> x], t)
+          | [%type: bool] -> ([%expr string_of_bool], t)
+          | [%type: int] -> ([%expr string_of_int], t)
+          | [%type: float] -> ([%expr string_of_float], t)
+          | unsupported_typ ->
+            (* TODO: Add support for all types? *)
+            failwith
+              (Printf.sprintf
+                 "parmamters of type %s not supported for param %s"
+                 (string_of_core_type unsupported_typ)
+                 name)
         in
         let default =
-          (Json_schema.root s.schema).default
+          elem.default
           |> Option.map (Json_repr.any_to_repr (module Json_repr.Yojson))
           |> Option.map (function
                | `String s -> Ast.estring s
@@ -427,7 +423,7 @@ module EndpointsModule = struct
     (* TODO What to do with this unsupported thing? *)
     match responses |> List.assoc_opt `OK with
     | None ->
-        (* TODO This is only required if it is the ONLY response. So need to account for others *)
+        (* TODO 200 is required only when it is the ONLY response. So need to account for others *)
         (* https://spec.openapis.org/oas/v3.1.0#responses-object *)
         raise (Invalid_data "Invalid schema: no 200 response")
     | Some schema -> (
