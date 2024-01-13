@@ -8,22 +8,30 @@ exception Invalid_spec of string
 (* A string map *)
 module SM = Map.Make (String)
 
-type kind =
-  [ `Json
-  | `Multipart_form
-  | `Html
-  ]
+module Media_kind = struct
+  type t =
+    [ `Html
+    | `Json
+    | `Multipart_form
+    ]
 
-let kind_of_media_type = function
-  | "application/json" -> `Json
-  | "multipart/form-data" -> `Multipart_form
-  | "text/html" -> `Html
-  | media_type -> raise (Invalid_spec ("unsupported media type " ^ media_type))
+  let to_variant_name = function
+    | `Html -> "Html"
+    | `Json -> "Json"
+    | `Multipart_form -> "Multipart_form"
+
+  let of_media_type = function
+    | "text/html" -> `Html
+    | "application/json" -> `Json
+    | "multipart/form-data" -> `Multipart_form
+    | media_type ->
+        raise (Invalid_spec ("unsupported media type " ^ media_type))
+end
 
 type schema =
   { name : string
   ; schema : O.schema
-  ; kind : kind
+  ; kind : Media_kind.t
   }
 (** All schemas in the http_spec must have a name, this should be unique *)
 
@@ -97,7 +105,7 @@ module Message = struct
                         "Parameter %s has neither schema nor content"
                         param.name)
             in
-            let kind = kind_of_media_type media_type in
+            let kind = Media_kind.of_media_type media_type in
             { name = schema.name |> Option.value ~default:default_name
             ; kind
             ; schema
@@ -210,7 +218,7 @@ module Message = struct
             | (media_type, c) :: _ ->
             match c.schema with
             | Some schema ->
-                let kind = kind_of_media_type media_type in
+                let kind = Media_kind.of_media_type media_type in
                 let name =
                   match schema.name with
                   | Some n -> n
@@ -265,7 +273,7 @@ module Message = struct
                          does OpenAPI allow this?"
                         media_type)
                | Some schema ->
-                   let kind = kind_of_media_type media_type in
+                   let kind = Media_kind.of_media_type media_type in
                    let name =
                      match schema.name with
                      | Some n -> n
