@@ -226,13 +226,14 @@ module DataModule = struct
       =
    fun (name, schema) ->
     let name = n (Some (Camelsnakekebab.upper_camel_case name)) in
+    (* TODO: NEXT add generation of "to_multipart" *)
     let type_declarations =
       [ Ast.pstr_type Recursive (type_declarations_of_schema schema.schema) ]
     in
     let expr = Ast.pmod_structure type_declarations in
     Ast.module_binding ~name ~expr |> Ast.pstr_module
 
-  (* Why don't we need the full path? *)
+  (* We only need the last part of the path, which is the key in the OpenAPI schema object *)
   let rec json_query_path_terminal : Json_query.path -> string = function
     | [] -> failwith "Invalid ref path: does not end with field"
     | [ `Field f ] -> f
@@ -297,7 +298,6 @@ module DataModule = struct
       in
       Ast.pmod_structure structure_items
     in
-
     Ast.module_binding ~name ~expr |> Ast.pstr_module
 end
 
@@ -319,11 +319,11 @@ module EndpointsModule = struct
       { query : param list
       ; path : param list
       ; header : param list
-      ; form : param list
+      ; cookie : param list
       }
 
-    let empty = { query = []; path = []; header = []; form = [] }
-    let to_list { query; path; header; form } = query @ path @ header @ form
+    let empty = { query = []; path = []; header = []; cookie = [] }
+    let to_list { query; path; header; cookie } = query @ path @ header @ cookie
 
     let rec string_conv_and_format_of_elem_kind :
         Json_schema.element_kind -> expression * string option = function
@@ -352,7 +352,7 @@ module EndpointsModule = struct
             (Invalid_argument
                "string_conv_and_format_of_elem_kind given def-ref")
       | Monomorphic_array (_, _) ->
-          (* TODO Why are we not currently supportin array? *)
+          (* TODO Why are we not currently supporting array? *)
           raise
             (Invalid_argument "string_conv_and_format_of_elem_kind given array")
       | Any ->
@@ -489,37 +489,8 @@ module EndpointsModule = struct
       { query = P.query params |> List.map of_http_spec_param
       ; path = P.path params |> List.map of_http_spec_param
       ; header = P.header params |> List.map of_http_spec_param
-      ; form =
-          P.cookie params |> List.map of_http_spec_param
-          (* TODO! Move this into data object! *)
-          (* ; cookie = P.cookie params |> List.map of_http_spec_param   *)
+      ; cookie = P.cookie params |> List.map of_http_spec_param
       }
-
-    (* match params with *)
-    (* | None -> empty *)
-    (* | Some ps -> *)
-    (*     ps *)
-    (*     |> ListLabels.fold_right *)
-    (*          ~init:{ query = []; path = []; header = []; form = [] } *)
-    (*          ~f:(fun i acc -> *)
-    (*            match i with *)
-    (*            | `Ref (r : Openapi_spec.reference) -> *)
-    (*                failwith *)
-    (*                  (Printf.sprintf *)
-    (* "references not yet supported for params, given \ *)
-       (*                      param ref %s" *)
-    (*                     r.ref_) *)
-    (*            | `Obj (p : Openapi_spec.parameter) -> *)
-    (*            match p.in_ with *)
-    (*            | `Query -> *)
-    (*                { acc with query = of_openapi_parameter p :: acc.query } *)
-    (*            | `Path -> *)
-    (*                { acc with path = of_openapi_parameter p :: acc.path } *)
-    (*            | `Header -> *)
-    (*                { acc with header = of_openapi_parameter p :: acc.header } *)
-    (*            | `Cookie -> *)
-    (*                (\* TODO *\) *)
-    (*                failwith "unsupported parameter location 'cookie") *)
   end
 
   type operation_function =
@@ -533,6 +504,10 @@ module EndpointsModule = struct
   let to_json_fun mod_name : expression =
     let mod_name = Camelsnakekebab.upper_camel_case mod_name in
     Ast.evar (data_module_fun_name mod_name "to_yojson")
+
+  let to_multipart_fun mod_name : expression =
+    let mod_name = Camelsnakekebab.upper_camel_case mod_name in
+    Ast.evar (data_module_fun_name mod_name "to_multipart")
 
   let response_decoder (responses : H.Message.Responses.t) : expression =
     (* TODO What to do with this unsupported thing? *)
@@ -583,36 +558,68 @@ module EndpointsModule = struct
              param.pat
              body')
 
-  let form_part_data : Params.param list -> expression =
-   fun params ->
-    let optional_part_data =
-      params
-      |> List.map (fun (param : Params.param) ->
-             let name = Ast.estring param.name in
-             (* If we have an optional param with no default, we need to map it from an option type *)
-             if param.optional && Option.is_none param.default then
-               match param.format with
-               | Some "binary" ->
-                   [%expr
-                     Option.map (fun v -> `File ([%e name], v)) [%e param.var]]
-               | _ ->
-                   [%expr
-                     Option.map
-                       (fun v -> `String ([%e name], [%e param.to_string] v))
-                       [%e param.var]]
-             else
-               match param.format with
-               | Some "binary" ->
-                   [%expr Some (`File ([%e name], [%e param.var]))]
-               | _ ->
-                   [%expr
-                     Some
-                       (`String
-                         ([%e name], [%e param.to_string] [%e param.var]))])
-      |> Ast.elist
-    in
-    (* Just take the parts that where defined *)
-    [%expr List.filter_map (fun x -> x) [%e optional_part_data]]
+  (* (\* Constructs a method that will construct multipart form data. *\) *)
+  (* let form_part_data : H.schema -> expression = *)
+  (*  fun schema -> *)
+  (*  let json_conv = "Data." AstExt.to_module_name schema.name in *)
+  (*   let element = Json_schema.root schema in *)
+  (*   let properties = *)
+  (*     match element.kind with *)
+  (*     | Object specs -> specs.properties *)
+  (*     | _ -> *)
+  (*         raise *)
+  (*           (Invalid_data *)
+  (*              "Multipart form data is not specified by a schema object") *)
+  (*   in *)
+  (*   let property_to_part *)
+  (*       ((name, elem, required, _) : string * Json_schema.element * bool * _) = *)
+  (*     (\** This is not safe *\) *)
+  (*     let field = Camelsnakekebab.lower_snake_case name in *)
+  (*     let format v = match elem.format with *)
+  (*       | Some "binary" -> Ast.pexp_variant "File" (Some v) (\* `File v *\) *)
+  (*       | _ -> Ast.pexp_variant "String" (Some v) (\* `String v *\) *)
+  (*     in *)
+  (*     let conv = match elem.kind with *)
+  (*     | Boolean -> [%expr string_of_bool] *)
+  (*     | Integer _ -> [%expr string_of_int] *)
+  (*     | Number _ -> [%expr string_of_float] *)
+  (*     | String _ -> [%expr fun x -> x] *)
+  (*     | _ -> failwith ("TODO Unsupported parameter type in multipart form spec in field" ^ field) *)
+  (*     in *)
+  (*     let value = match required, elem.default with *)
+  (*       | true, _ -> Ast.pexp_field [%expr data] AstExt.to *)
+  (*     in *)
+  (*     _ *)
+
+  (*   in *)
+  (*   let optional_part_data = *)
+  (*     element.kind *)
+  (*     |> List.map (fun (param : Params.param) -> *)
+  (*            let name = Ast.estring param.name in *)
+  (*            (\* If we have an optional param with no default, we need to map it from an option type *\) *)
+  (*            if param.optional && Option.is_none param.default then *)
+  (*              match param.format with *)
+  (*              | Some "binary" -> *)
+  (*                  [%expr *)
+  (*                    Option.map (fun v -> `File ([%e name], v)) [%e param.var]] *)
+  (*              | _ -> *)
+  (*                  [%expr *)
+  (*                    Option.map *)
+  (*                      (fun v -> `String ([%e name], [%e param.to_string] v)) *)
+  (*                      [%e param.var]] *)
+  (*            else *)
+  (*              match param.format with *)
+  (*              | Some "binary" -> *)
+  (*                  [%expr Some (`File ([%e name], [%e param.var]))] *)
+  (*              | _ -> *)
+  (*                  [%expr *)
+  (*                    Some *)
+  (*                      (`String *)
+  (*                        ([%e name], [%e param.to_string] [%e param.var]))]) *)
+  (*     |> Ast.elist *)
+  (*   in *)
+  (*   (\* Just take the parts that where defined *\) *)
+  (*   [%expr List.filter_map (fun x -> x) [%e optional_part_data]] *)
 
   (* Extract the Ref path from a schema, if it has one *)
   let ref_of_schema : Json_schema.schema -> string option =
@@ -621,43 +628,24 @@ module EndpointsModule = struct
     | Def_ref path -> Some (DataModule.json_query_path_terminal path)
     | _ -> None
 
-  let data_conv_and_param :
-      H.Message.Request.t -> expression * pattern * Params.param list =
-    let from_json (schema : H.schema) =
-      ( [%expr Some (`Json ([%e to_json_fun schema.name] data))]
-      , [%pat? data]
-      , [] )
-    and from_multipart (schema : H.schema) =
-      (* TODO hella awkward schema.schema.schema, lol -- need to rename *)
-      match (Json_schema.root schema.schema.schema).kind with
-      | Object { properties; _ } ->
-          let params =
-            properties
-            |> List.map (fun (name, elem, required, _) ->
-                   Params.param_of_element ~name ~optional:(not required) elem)
-          in
-          ( [%expr Some (`Multipart_form [%e form_part_data params])]
-          , [%pat? ()]
-          , params )
-      | _ ->
-          raise (Invalid_argument "non object as input for multipart form data")
-    in
-    fun req ->
-      match req.content with
-      | None -> ([%expr None], [%pat? ()], [])
-      | Some { schema; _ } ->
-      match schema.kind with
-      | `Json -> from_json schema
-      | `Multipart_form -> from_multipart schema
-      | `Html -> raise (Failure "TODO")
+  let data_conv_and_pat : H.Message.Request.t -> expression * pattern = function
+    | { content = None; _ } -> ([%expr None], [%pat? ()])
+    | { content = Some { schema; _ }; _ } ->
+        let data_exp =
+          match schema.kind with
+          | `Json -> [%expr Some (`Json ([%e to_json_fun schema.name] data))]
+          | `Html -> [%expr Some (`Html data)]
+          | `Multipart_form ->
+              [%expr
+                Some (`Multipart_form ([%e to_multipart_fun schema.name] data))]
+        in
+        (data_exp, [%pat? data])
 
-  (* TODO rename to operation_fun? *)
   let operation_fun_expr : Http_spec.Message.t -> structure_item =
    fun message ->
     let name = operation_function_name message.req.id in
     let params = Params.of_openapi_parameters message.req.params in
-    let data_conv, data_param, form_params = data_conv_and_param message.req in
-    let params = { params with form = form_params } in
+    let data_conv, data_pat = data_conv_and_pat message.req in
     let decode_resp = response_decoder message.resp in
     let meth = Ast.pexp_variant (Http.Method.to_string message.req.meth) None in
     let body =
@@ -671,7 +659,7 @@ module EndpointsModule = struct
           ~decode:[%e decode_resp]
           [%e meth]]
     in
-    [%stri let [%p name] = [%e fun_with_params ~data:data_param params body]]
+    [%stri let [%p name] = [%e fun_with_params ~data:data_pat params body]]
 
   (** Construct the AST node of the module with all endpoint functions *)
   let of_messages : Http_spec.Message.t list -> string -> structure_item list =
