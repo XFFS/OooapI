@@ -49,8 +49,10 @@ module DataModule = struct
         | Id_ref _ -> failwith "unsupported: id_ref schema"
         | Ext_ref _ -> failwith "unsupported: ext_ref schema"
         | Dummy -> failwith "unsupported: dummy schema"
-        | Array (_, _) -> failwith "unsupported: het-array"
         (* Supported schemas *)
+        | Array (_, _) ->
+            [%type: Yojson.Safe.t]
+            (* TODO: If min and max items are equal, this can be a tuple *)
         | Any -> [%type: Yojson.Safe.t]
         | Null -> [%type: unit]
         | Boolean -> [%type: bool]
