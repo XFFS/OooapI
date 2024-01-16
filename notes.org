@@ -22,12 +22,15 @@ yq < ./thespec.yaml > ./thespec.json
 - Otherwise it is derived from its location
 ** DONE Move hardcoded ppx module into library that can be imported
 This then also takes care of all needed dependencies!
-** TODO Move multipart forms into data object
+** DONE Move multipart forms into data object
+** DONE Generate OpenAPI specs from ocaml values
+** TODO Fix all TODOs (esp. around exception raising)
+** TODO Test on multipart forms
+Will do in Ooapi project
 ** TODO Content conversion
 https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
 ** TODO Support url encoded forms
 ** TODO Automate conversion of yaml to json for specs, via yq
-** TODO Generate OpenAPI specs from ocaml values
 ** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
 ** TODO Factor out OCaml of JSONSchema
 This should be useful on its own I guess?
