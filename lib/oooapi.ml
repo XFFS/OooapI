@@ -6,157 +6,76 @@ module DAG = DAG
 module H = Http_spec
 
 module DataModule = struct
-  (* TODO Account for constraints, like pattern, min/max format etc.?
-     This could be thru abstract types or thru validators in constructors *)
 
-  let deriving_attrs ~is_record =
-    if is_record then
-      [
-        Ast.attribute ~name:(n "deriving")
-          ~payload:(PStr [ [%stri yojson { strict = false }, make] ]);
-      ]
-    else
-      [
-        Ast.attribute ~name:(n "deriving")
-          ~payload:(PStr [ [%stri yojson { strict = false }] ]);
-      ]
+  exception Unsupported of string
+  exception Invalid_spec of string
+  let raise_invalid msg = raise (Invalid_spec msg)
 
-  let rec module_name_of_def_ref : Json_query.path -> string = function
-    | [] -> failwith "invalid component query path"
-    | [ `Field n ] -> Camelsnakekebab.upper_camel_case n
-    | _ :: rest -> module_name_of_def_ref rest
-
-  let type_name_of_def_ref : Json_query.path -> string =
-   fun p -> module_name_of_def_ref p ^ ".t"
-
-  let rec type_of_element
-    : qualifier:string -> Json_schema.element -> (core_type * type_declaration list)
-    =
-    fun ~qualifier element ->
-    match (element.kind : Json_schema.element_kind) with
-    (* Unsupported schemas *)
-    | Id_ref _ -> failwith "unsupported: id_ref schema"
-    | Ext_ref _ -> failwith "unsupported: ext_ref schema"
-    | Dummy -> failwith "unsupported: dummy schema"
-    (* Supported schemas *)
-    (* TODO: If min and max items are equal, Array can be a tuple *)
-    | Array (_, _) -> [%type: Yojson.Safe.t], []
-    | Any -> [%type: Yojson.Safe.t], []
-    | Null -> [%type: unit], []
-    | Boolean ->  [%type: bool], []
-    | Integer _ -> [%type: int], []
-    | Number _ -> [%type: float], []
-    | String _ -> [%type: string], []
-    | Combine (comb, elems) -> type_of_combine ~qualifier (comb, elems)
-    | Def_ref path ->
-      AstExt.Type.v (AstExt.Type.constr (type_name_of_def_ref path)), []
-    | Monomorphic_array (e, _) ->
-      let item_type_name = qualifier ^ "_item" in
-      let item_type, decls = type_of_element ~qualifier:item_type_name e in
-      ([%type: [%t item_type] list], decls)
-    | Object o ->
-      let decls = type_decl_of_object ~name:qualifier o in
-      let typ = AstExt.Type.v (AstExt.Type.constr qualifier) in
-      let typ = if o.nullable then [%type: [%t typ] option] else typ in
-      (typ, decls)
-
-  and type_of_combine
-    : qualifier:string -> Json_schema.combinator * Json_schema.element list
-      -> (core_type * type_declaration list) =
-   fun ~qualifier (comb, elems) ->
-   match comb with
-   | Json_schema.All_of | Json_schema.Not -> [%type: Yojson.Safe.t], []
-   | Json_schema.Any_of | Json_schema.One_of ->
-    match
-      elems |> List.find_opt (function | Json_schema.{ kind = String _; _ } -> true | _ -> false)
-    with
-    (* If it can be a string, let it be a string *)
-    | Some s -> type_of_element ~qualifier s
-    (* Otherwise let it be the first thing it could be *)
-    (* TODO What if elems is empty? *)
-    | _ -> type_of_element ~qualifier (List.hd elems)
-
-  and record_label
-    : type_name:string -> string * Json_schema.element * bool * _ -> label_declaration * type_declaration list =
-    fun ~type_name (field_name, element, required, _) ->
-    let fname = AstExt.to_identifier field_name in
-    let pld_type, declarations =
-      let field_type, decls = type_of_element ~qualifier:fname element in
-      let field_type = if required then field_type else [%type: [%t field_type] option] in
-      field_type, decls
-    in
-    let pld_attributes =
-      let doc_attr =
-        match element.description with
-        | None -> []
-        | Some d -> [ AstExt.attr_str ~name:"ocaml.doc" d ]
-      in
-      let key_attr =
-        (* ppx_json_conv *)
-        [ AstExt.attr_str ~name:"key" field_name ]
-      in
-      let qualifier_attrs =
-        if required then (* ppx_make *)
-          [ AstExt.attr ~name:"required" ]
-        else
-          (* ppx_json_conv *)
-          [ AstExt.attr_ident ~name:"default" "None" ]
-      in
-      doc_attr @ key_attr @ qualifier_attrs
-    in
-    let pld_name =
-      if String.equal type_name "t" then n fname
-      else
-        (* Prefix each field label with the type name to avoid
-           label clashes between different types *)
-        n (type_name ^ "_" ^ fname)
-    in
-    let label_type = {pld_type; pld_attributes; pld_name; pld_mutable = Immutable; pld_loc = loc;} in
-    label_type, declarations
-
-  and type_decl_of_object
-    : name:string -> Json_schema.object_specs -> type_declaration list =
-    (* TODO Support for ignored aspects of spec? *)
-    fun ~name { properties; _ } ->
-      match properties with
-      | [] ->
-        let manifest = [%type: Yojson.Safe.t] in
-        let attributes = deriving_attrs ~is_record:false in
-        [ AstExt.Type.decl name ~manifest ~attributes ]
-      | _ ->
-        let labels, decls =
-          properties |> ListLabels.fold_right
-            ~init:([], [])
-            ~f:(fun property (labels, decls) ->
-                let (label, decl) = record_label ~type_name:name property in
-                label :: labels, decl @ decls)
+  let to_multipart_fun_of_decl : type_declaration -> structure_item =
+    let form_part_of_label
+      : label_declaration -> expression =
+      fun {pld_name; pld_type; _} ->
+        let field_name = Ast.estring pld_name.txt in
+        (* Make the values uniformly optional *)
+        let opt_value = match pld_type with
+          | [%type: [%t? _] option] -> AstExt.Exp.field_access [%expr t] pld_name.txt
+          | _ -> [%expr Some [%e AstExt.Exp.field_access [%expr t] pld_name.txt]]
         in
-        let kind = Ptype_record labels in
-        let attributes = deriving_attrs ~is_record:true in
-        decls @ [AstExt.Type.decl name ~kind ~attributes]
-
-  let type_declarations_of_schema
-    : Openapi_spec.schema -> type_declaration list
-    = fun schema ->
-      let name = "t" in
-      let root =  Json_schema.root schema.schema  in
-      match root.kind with
-      | Object specs -> type_decl_of_object ~name specs
-      | _ ->
-        let attributes = deriving_attrs ~is_record:false in
-        let typ, decls = type_of_element ~qualifier:name root in
-        decls @ [AstExt.Type.decl name ~attributes ~manifest:typ]
+        (* TODO: More general and nicer way to derive this  *)
+        (* The [v] is bound in the `Some` match case bellow *)
+        let field_value = match pld_type with
+        | [%type: int]
+        | [%type: int option] ->
+          [%expr `String (string_of_int v)]
+        | [%type: float]
+        | [%type: float option] ->
+          [%expr `String (string_of_float v)]
+        | [%type: bool]
+        | [%type: bool option] ->
+          [%expr `String (string_of_bool v)]
+        | [%type: string]
+        | [%type: string option] ->
+          [%expr `String v]
+        | [%type: [`File of string | `String of string]]
+        | [%type: [`File of string | `String of string] option] ->
+          [%expr v]
+        | _ ->
+          raise (Unsupported ("unsupported type for field '" ^ pld_name.txt ^ "' of multipart form"))
+        in
+        (* TODO: We should actually construct two different parts:
+           one for the optional one for required *)
+        (* Each field is treated as optional, if `None` will be filtered out *)
+        [%expr match [%e opt_value] with
+          | None -> None
+          | Some v -> Some ([%e field_name], [%e field_value])]
+    in
+    fun decl ->
+      match decl.ptype_kind with
+      | Ptype_record labels ->
+        let body : expression =
+          [%expr List.filter_map (fun x -> Fun.id x)
+              [%e labels |> List.map form_part_of_label |> Ast.elist]]
+        in
+        let fun_def: expression = AstExt.Exp.f [%pat? t] body in
+        [%stri
+          let to_multipart
+            : t -> (string * [`String of string | `File of string]) list
+            = [%e fun_def]
+        ]
+      | _ -> raise_invalid "multipart media type must be described by a record"
 
   let data_module_of_schema_entry : string * Http_spec.schema -> structure_item
       =
    fun (name, schema) ->
     let name = n (Some (Camelsnakekebab.upper_camel_case name)) in
+    let main_decl, declarations = Ocaml_of_json_schema.type_declarations schema.schema.schema in
     let type_declarations =
-      [ Ast.pstr_type Recursive (type_declarations_of_schema schema.schema) ]
+      let dependency_ordered_declarations = declarations @ [main_decl] in
+      List.map (fun decl -> Ast.pstr_type Recursive [decl]) dependency_ordered_declarations
     in
     (* TODO: NEXT add generation of "to_multipart" *)
     let to_multipart = match schema.kind with
-      | `Multipart_form -> []
+      | `Multipart_form -> [to_multipart_fun_of_decl main_decl]
       | _ -> []
     in
     let expr = Ast.pmod_structure (type_declarations @ to_multipart) in
@@ -351,7 +270,7 @@ module EndpointsModule = struct
         let schema = p.schema.schema.schema in
         let elem = Json_schema.root schema in
         let to_string, typ =
-          let t = DataModule.type_of_element ~qualifier:"N/A" elem |> fst in
+          let t = Ocaml_of_json_schema.type_of_element ~qualifier:"N/A" elem |> fst in
           match t with
           | [%type: string] -> ([%expr fun x -> x], t)
           | [%type: bool] -> ([%expr string_of_bool], t)

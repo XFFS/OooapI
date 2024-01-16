@@ -119,6 +119,7 @@ module AstExt = struct
     let constr ?(args = []) name =
       Ptyp_constr (n (Astlib.Longident.parse name), args)
 
+
     (** A type declaration *)
     let decl
         ?kind
@@ -160,7 +161,17 @@ module AstExt = struct
     let const_str s : expression =
       Ast.pexp_constant (Pconst_string (s, loc, None))
 
-    (** A function *)
+    (** Access a record field *)
+    let field_access : expression -> string -> expression =
+      fun record field_name -> Ast.pexp_field record (n (Longident.parse field_name))
+
+    (** A function
+
+        - If [label] is provided, then argument to the function is labeled
+        - If [optional] is [true], then the label is optional
+        - If [default] is provided, it is the default value, and this requires that [optional] also be true
+        - [pat] is the pattern of the function parameter
+        - [exp] is the body of the function *)
     let f ?label ?(optional = false) ?default pat exp =
       let label =
         Option.(

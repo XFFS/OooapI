@@ -17,18 +17,20 @@ yq < ./thespec.yaml > ./thespec.json
 * Tasks
 ** DONE Map OpenAPI to a more sensible data structure
 *** Reuse Cohttp's =http= types as much as possible.
-** TODO Automate conversion of yaml to json for specs, via yq
-** TODO Every schema needs a (ideally unique) name
+** DONE Every schema needs a (ideally unique) name
 - If in "schemas", the name is the schema key
 - Otherwise it is derived from its location
+** DONE Move hardcoded ppx module into library that can be imported
+This then also takes care of all needed dependencies!
 ** TODO Move multipart forms into data object
 ** TODO Content conversion
 https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
 ** TODO Support url encoded forms
-** DONE Move hardcoded ppx module into library that can be imported
-This then also takes care of all needed dependencies!
+** TODO Automate conversion of yaml to json for specs, via yq
 ** TODO Generate OpenAPI specs from ocaml values
 ** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
+** TODO Factor out OCaml of JSONSchema
+This should be useful on its own I guess?
 ** KILL Add generation of a dune stanza
 Not needed know that we supply a library.
 ** TODO Support operation-level server override
