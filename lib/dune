@@ -2,10 +2,9 @@
  (name lib)
  (libraries
   openapi_spec
-  compiler-libs
-  ppxlib
-  camelsnakekebab
-  cohttp-lwt-unix
-  http                          ; TODO?
-  )
+  ppxlib          ; used for constructing well formed ocaml
+  camelsnakekebab ; used for sanitizing and forming correct ocaml names
+  unix            ; provided by unix
+  http            ; used in http_spec
+ )
  (preprocess (pps ppxlib.metaquot)))
