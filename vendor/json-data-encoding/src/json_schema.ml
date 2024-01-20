@@ -942,6 +942,9 @@ module Make (Repr : Json_repr.Repr) = struct
         (* 1. An element with a known type field and associated fields. *)
         let as_kind =
           match opt_field_view json "type" with
+          | None when Option.is_some (opt_field_view json "properties") ->
+              (* If a schema has properties but no type, we can infer it is an object *)
+              Some (element (parse_element_kind source json "object"))
           | Some (`String name) ->
               Some (element (parse_element_kind source json name))
           | Some (`A [] as k) ->
