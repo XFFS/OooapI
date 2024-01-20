@@ -31,6 +31,7 @@ let type_of_string_specs
   = fun specs -> match specs.str_format with
     | None -> [%type: string]
     | Some "binary" -> [%type: [`File of string | `String of string]]
+    | Some "uri" -> [%type: [`File of string | `String of string]] (* TODO special support for URIs? *)
     | Some fmt -> failwith ("unsupported string format " ^ fmt)
 
 let rec type_of_element
