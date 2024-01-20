@@ -13,6 +13,11 @@ metaprogramming. This in contrast to an approach for
 - [[./vendor][./vendor]]  :: Vendored libraries. Currently only including
   =json-data-encoding=, which is used for its JSON spec support.
 
+* TODO Architecture
+
+spec -> Openapi_spec.parse -> Openapi_spec.resolve_refs -> Http_spec.of_openapi
+-> Oooapi.make_client
+
 * Testing
 
 To test spec parsing and client generation, run

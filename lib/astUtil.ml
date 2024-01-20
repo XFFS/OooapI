@@ -110,11 +110,15 @@ module AstExt = struct
     let v ptyp_desc : core_type =
       { ptyp_desc; ptyp_loc = loc; ptyp_loc_stack = []; ptyp_attributes = [] }
 
+    (** [t n args] is the type derived by applying the constructor [n] to [args], e.g., [t list [int_t]] is [int list] *)
+    let t name args = Ast.ptyp_constr (Ast.Located.lident name) args
+
     (** A type constructor
 
         E.g., [constr "Foo" [int, str]] makes the type constructor [(int, str) Foo] *)
     let constr ?(args = []) name =
       Ptyp_constr (n (Astlib.Longident.parse name), args)
+
 
     (** A type declaration *)
     let decl
@@ -157,7 +161,17 @@ module AstExt = struct
     let const_str s : expression =
       Ast.pexp_constant (Pconst_string (s, loc, None))
 
-    (** A function *)
+    (** Access a record field *)
+    let field_access : expression -> string -> expression =
+      fun record field_name -> Ast.pexp_field record (n (Longident.parse field_name))
+
+    (** A function
+
+        - If [label] is provided, then argument to the function is labeled
+        - If [optional] is [true], then the label is optional
+        - If [default] is provided, it is the default value, and this requires that [optional] also be true
+        - [pat] is the pattern of the function parameter
+        - [exp] is the body of the function *)
     let f ?label ?(optional = false) ?default pat exp =
       let label =
         Option.(

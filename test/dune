@@ -1,5 +1,21 @@
-(tests
- (names tests)
- (libraries openapi_spec lib tezt)
- (deps openai-blackbox/openapi-openai.json
-       cli-blackbox/tictactoe.json))
+(copy_files
+ (files openai-blackbox.t/openapi-openai.json))
+
+(copy_files
+ (files cli-blackbox.t/tictactoe.json))
+
+(test
+ (name tests)
+ (libraries openapi_spec lib tezt expect_tests)
+ (deps openapi-openai.json
+       tictactoe.json))
+
+(cram
+ (deps
+  %{bin:oooapi}
+  %{bin:dune})
+ (applies_to openai-blackbox)
+ ; we don't want to run this test in CI because it eats OpenAPI credits
+ ; The `=false` sets the default value, so we only run these tests if
+ ; LOCAL_TESTS is `true`.
+ (enabled_if %{env:LOCAL_TESTS=false}))

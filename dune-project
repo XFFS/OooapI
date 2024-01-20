@@ -8,10 +8,11 @@
 (maintainers "Shon Feder")
 (source (github shonfeder/ooopai))
 
+; Defined in ./lib and ./bin
 (package
  (name oooapi)
- (synopsis "Short description")
- (description "Longer description")
+ (synopsis "OooapI is OCaml of OpenAPI")
+ (description "An executable to generate OCaml HTTP clients from OpenAPI specs")
  (depends
   (dune (> 2.9))
 
@@ -19,18 +20,36 @@
 
   (ppxlib (>= 0.28.0))
   (camelsnakekebab (>= 0.4))
+  (http (>= 6.0.0~alpha1))
 
+  ; Test deps
+  (ppx_expect (and :with-test (>= v0.15.1)))
+  (tezt :with-test)))
+
+(package
+ (name oooapi_lib)
+ (synopsis "A library abstracting calls to HTTP clients for OooapI")
+ (description
+   "A library abstracting calls to HTTP clients and all \
+providing all dependencies needed by OooapI generated clients")
+ (depends
+  (dune (> 2.9))
+
+  openapi_spec
+
+  ;  TODO Remove uneeded deps
   (multipart_form (>= 0.5.0))
   (multipart_form-lwt (>= 0.5.0))
   (multipart_form-cohttp-lwt (>= 0.5.0))
   (uuidm (>= 0.9.8))
   (cohttp-lwt-unix (>= 5.2.0))
+  (http (>= 6.0.0~alpha1))
   (tls (>= 0.17.0))
   (tls-lwt (>= 0.17.0))
 
-  ; Test deps
-  (ppx_deriving_yojson :with-test)
-  (ppx_deriving :with-test)
+  ; Required bi
+  (ppx_deriving_yojson (>= 3.7.0))
+  (ppx_deriving (>= 5.2.1))
 
   (ppx_expect (and :with-test (>= v0.15.1)))
   (tezt :with-test)))
@@ -43,6 +62,7 @@
   (dune (> 2.9))
 
   (atdgen (>= 2.11.0))
+  (uri (>= 4.2.0))
 
   (ppx_expect (and :with-test (>= v0.15.1)))
   (tezt :with-test)))

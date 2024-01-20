@@ -4,6 +4,7 @@
 
 For constructing OCaml
  https://ocaml-ppx.github.io/ppxlib/ppxlib/generating-code.html#metaquot
+
 * Notes
 
 ** To convert an OpenAPI spec from yaml to json
@@ -14,10 +15,56 @@ yq < ./thespec.yaml > ./thespec.json
 #+end_src
 
 * Tasks
-** TODO Automate conversion of yaml to json for specs, via yq
-** TODO Support url encoded forms
-** TODO Move hardcoded ppx module into library that can be imported
+** DONE Map OpenAPI to a more sensible data structure
+*** Reuse Cohttp's =http= types as much as possible.
+** DONE Every schema needs a (ideally unique) name
+- If in "schemas", the name is the schema key
+- Otherwise it is derived from its location
+** DONE Move hardcoded ppx module into library that can be imported
 This then also takes care of all needed dependencies!
-** TODO Generate OpenAPI specs from ocaml values
+** DONE Move multipart forms into data object
+** DONE Generate OpenAPI specs from ocaml values
+** TODO Fix all TODOs (esp. around exception raising)
+** TODO Test on multipart forms
+Will do in Ooapi project
+** TODO Content conversion
+https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
+** TODO Support url encoded forms
+** TODO Automate conversion of yaml to json for specs, via yq
 ** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
-** TODO Add generation of a dune stanza
+** TODO Factor out OCaml of JSONSchema
+This should be useful on its own I guess?
+** KILL Add generation of a dune stanza
+Not needed know that we supply a library.
+** TODO Support operation-level server override
+See the server field in https://spec.openapis.org/oas/latest.html#fixed-fields-7
+* On OpenAPI and JSON Schema
+** =parameters= for an endpoint can be specified in two different ways, and consumers of a spec are responsible for detecting overrides
+This amounts to an ad hoc, bizarre method of doing inheritance.
+
+See the =parameters= property in these places
+
+- https://spec.openapis.org/oas/latest.html#operationObject
+- https://spec.openapis.org/oas/latest.html#path-item-object
+** Specification of OpenAPI references are inconsistent and nonsensical
+Most objects that can be referenced do so by having a union type on the schema.
+E.g., =Header Object | Reference Object= is either a header object or a
+reference object.
+
+But for https://spec.openapis.org/oas/latest.html#pathItemObject, this
+alternative is indicated by an optional field on the object `$ref`, and a
+warning that if this field is used along with the other fields, the meaning is
+undefined. That is, each path item object has a field `$ref` that can refers to
+a path item object (wtf?), and if it does and any other fields are used, you
+have undefined semantics in your spec. This could be avoided by using a union
+type here as they do everywhere else.
+
+Worse: in the https://spec.openapis.org/oas/latest.html#componentsObject, the
+=pathItems= which can hold the referents for a referenced path items object has
+the type =Path Item Object | Reference Object=, so the reference can go to
+another reference, or to a path item object which can itself have reference in a
+different way.
+
+** Treatment of fields is inconsistent
+E.g., the =description= field is, for no noted reason, required for =response
+objects=, while it is optional for (nearly?) every other object.

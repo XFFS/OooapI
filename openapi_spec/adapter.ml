@@ -7,7 +7,7 @@ module Of_ref = struct
       when List.exists
              (function
                | "$ref", _ -> true
-               | _ -> false)
+               | _, _ -> false)
              fields ->
         `List [ `String "Ref"; json ]
     | other -> `List [ `String "Obj"; other ]

@@ -31,11 +31,11 @@ type reference =
 type t =
   { openapi : version
   ; info : info
-  ; ?servers : server list option
-  ; ?paths : paths option
+  ; ~servers : server list
+  ; ~paths : paths
+  ; ?components : components option
   ; ?jsonSchemaDialect : string option
   ; ?webhooks : webhooks option
-  ; ?components : components option
   ; ?security : security option
   ; ?tags : tags option
   ; ?externalDocs : externalDocs option
@@ -47,9 +47,11 @@ type schema = json wrap <ocaml module="Json_schema_converter">
 (* https://spec.openapis.org/oas/v3.1.0#versions *)
 type version = string
 
-type json <ocaml module="Yojson.Safe" t="t"> = abstract
+(** JSON typed stuff *)
+type json <ocaml module="Json" t="t"> = abstract
 
-type todo <ocaml module="Yojson.Safe" t="t"> = abstract
+(** Things that aren't implemented yet *)
+type todo = json
 
 (* https://spec.openapis.org/oas/v3.1.0#infoObject *)
 type info =
@@ -118,6 +120,14 @@ type operation =
   : server list option
   }
 
+(* https://spec.openapis.org/oas/latest.html#fixed-fields-9 See field 'in' *)
+type param_location =
+  [ Path <json name="path">
+  | Query <json name="query">
+  | Header <json name="header">
+  | Cookie <json name="cookie">
+  ]
+
 (* TODO Compute defaults and validate MUSTs *)
 type parameter =
   { name
@@ -129,7 +139,7 @@ type parameter =
     : string
   ; in_ <json name="in">
     <doc text="REQUIRED. The location of the parameter. Possible values are \"query\", \"header\", \"path\" or \"cookie\".">
-  : string
+  : param_location
   ; ?description
     <doc text="A brief description of the parameter. This could contain examples of use. CommonMark syntax MAY be used for rich text representation.">
   : string option
@@ -180,7 +190,7 @@ type media_type =
   { ?schema <doc text="The schema defining the content of the request, response, or parameter.">
   : schema option (* Schema Object *)
   ; ?example <doc text="Example of the media type. The example object SHOULD be in the correct format as specified by the media type. The example field is mutually exclusive of the examples field. Furthermore, if referencing a schema which contains an example, the example value SHALL override the example provided by the schema.">
-  : json option
+  : todo option
   ; ?examples <doc text="Examples of the media type. Each example object SHOULD match the media type and specified schema if present. The examples field is mutually exclusive of the example field. Furthermore, if referencing a schema which contains an example, the examples value SHALL override the example provided by the schema.">
   : todo option (* Map[ string, Example Object | Reference Object] *)
   ; ?encoding <doc text="A map between a property name and its encoding information. The key, being the property name, MUST exist in the schema as a property. The encoding object SHALL only apply to requestBody objects when the media type is multipart or application/x-www-form-urlencoded.">
@@ -204,16 +214,16 @@ type response =
 
 (* https://spec.openapis.org/oas/v3.1.0#componentsObject *)
 type components =
-  { ?schemas : (string * schema) list <json repr="object"> option
+  { ~schemas : (string * schema) list <json repr="object">
+  ; ~parameters : (string * parameter) list <json repr="object">
+  ; ~requestBodies : (string * request_body) list <json repr="object">
+  ; ~pathItems : (string * path_item) list <json repr="object">
   ; ?responses : todo option  (* Map[string, Response Object | Reference Object]  *)
-  ; ?parameters : todo option (* Map[string, Parameter Object | Reference Object]  *)
   ; ?examples : todo option (* Map[string, Example Object | Reference Object]  *)
-  ; ?requestBodies : todo option (* Map[string, Request Body Object | Reference Object]  *)
   ; ?headers : todo option (* Map[string, Header Object | Reference Object]  *)
   ; ?securitySchemes : todo option (* Map[string, Security Scheme Object | Reference Object]  *)
   ; ?links : todo option (* Map[string, Link Object | Reference Object]  *)
   ; ?callbacks : todo option (* Map[string, Callback Object | Reference Object]  *)
-  ; ?pathItems : todo option (* Map[string, Path Item Object | Reference Object]  *)
   }
 
 (* Map[string, Path Item Object | Reference Object] ] *)

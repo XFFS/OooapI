@@ -1,10 +1,10 @@
-module Config : Openai_api.Config = struct
+module Config : Oooapi_lib.Config = struct
   let default_headers = None
   let bearer_token = Sys.getenv_opt "OPENAI_API_KEY"
 end
 
 module Data = Openai_api.Data
-module Api = Openai_api.Endpoint (Config)
+module Api = Openai_api.Make (Oooapi_lib.Cohttp_client) (Config)
 
 let main =
   let open Lwt.Syntax in

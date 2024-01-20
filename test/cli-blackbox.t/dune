@@ -1,0 +1,12 @@
+(rule
+ (target tictactoe_api.ml)
+ (deps %{bin:oooapi}
+       (:spec tictactoe.json))
+ (action
+  (with-stdout-to %{target}
+    (run oooapi %{spec}))))
+
+(library
+ (name tictactoe_api)
+ (libraries oooapi_lib)
+ (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))

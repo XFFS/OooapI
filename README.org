@@ -34,6 +34,15 @@ It may be extended to support:
 - As little code should be dynamically generated as possible. Instead, put all
   reusable logic into a library.
 
+** Library principles
+
+- Each operation is defined as a function.
+- Everything that ends up the body of POST request is passed together as a
+  single ~data argument to an operation function, whether multipart form, JSON,
+  or binary data.
+- Anything that goes in the path, query parameters, or headers, is passed via
+  arguments to an operation function.
+
 * Alternatives
 
 [[https://github.com/OpenAPITools/openapi-generator/][OpenAPI Generator]] includes a generator that is meant to produce OCaml client boilerplate.

@@ -1,0 +1,8 @@
+(library
+ (public_name oooapi_lib)
+ (libraries yojson
+            cohttp-lwt-unix
+            multipart_form
+            multipart_form-lwt
+            multipart_form-cohttp-lwt
+            uuidm))
