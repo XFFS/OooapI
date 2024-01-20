@@ -827,6 +827,14 @@ module Make (Repr : Json_repr.Repr) = struct
       | Some (`Float f)
         when fst (modf f) = 0. && f <= 2. ** 53. && f >= -2. ** 53. ->
           Some f
+      | Some ((`String s) as k) ->
+        let f =
+          (* If we can convert to a float here, it was an IntLit in Yojson.Safe *)
+          try float_of_string s with
+          | _ -> raise (at_field n @@ unexpected k "integer")
+        in
+        Some f
+      (* TODO: We are failing to handle IntLit for large ints *)
       | Some k -> raise (at_field n @@ unexpected k "integer")
       | None -> None
     in
