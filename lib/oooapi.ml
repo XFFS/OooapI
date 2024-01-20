@@ -353,19 +353,34 @@ module EndpointsModule = struct
               Ast.evar (data_module_fun_name mod_name "of_yojson")
             in
             [%expr of_json_string [%e conv_fun]]
-        | `Html -> [%expr fun x -> x]
-        | `Multipart_form -> raise (Failure "TODO"))
+        | `Html -> [%expr fun x -> Ok x]
+        | `Binary -> [%expr fun x -> Ok x]
+        | `Multipart_form -> raise (Failure "TODO responses from multipart forms not yet supported"))
 
   let path_parts path : expression =
     path
     |> List.map (function `C c -> Ast.estring c | `P p -> Ast.evar p)
     |> Ast.elist
 
-  let query_params (params : Params.param list) =
-    params
-    |> List.map (fun Params.{ name; to_string; var; _ } ->
-           [%expr [%e Ast.estring name], [%e to_string] [%e var]])
-    |> Ast.elist
+  let query_params
+    : Params.param list -> expression
+    =
+    let param_entry_expression
+      : Params.param -> expression
+      = fun { name; to_string; var; optional; default; _ } ->
+        match optional, default with
+        | true, None ->
+          (* The parameter is optional, defaulting to None *)
+          [%expr Option.map (fun p -> [%e Ast.estring name], ([%e to_string] p)) [%e var]]
+        | _ ->
+          (* We are assured to have a value. via default or required *)
+          [%expr Some ([%e Ast.estring name], [%e to_string] [%e var])]
+    in
+    fun params ->
+      let params_option_list = params |> List.map param_entry_expression |> Ast.elist
+      (* We filter out just the param entries that are actually supplied *)
+      in [%expr List.filter_map Fun.id [%e params_option_list]]
+
 
   let extra_headers (params : Params.param list) : expression =
     params
@@ -459,6 +474,7 @@ module EndpointsModule = struct
           match schema.kind with
           | `Json -> [%expr Some (`Json ([%e to_json_fun schema.name] data))]
           | `Html -> [%expr Some (`Html data)]
+          | `Binary -> [%expr Some (`Binary data)]
           | `Multipart_form ->
               [%expr
                 Some (`Multipart_form ([%e to_multipart_fun schema.name] data))]
@@ -470,15 +486,16 @@ module EndpointsModule = struct
     let name = operation_function_name message.req.id in
     let params = Params.of_openapi_parameters message.req.params in
     let data_conv, data_pat = data_conv_and_pat message.req in
-    let decode_resp = response_decoder message.resp in
     let meth = Ast.pexp_variant (Http.Method.to_string message.req.meth) None in
     let body =
       [%expr
-        make_request ?data:[%e data_conv] ~base_url
-          ~path:[%e path_parts message.req.path]
-          ~params:[%e query_params params.query]
-          ~headers:[%e extra_headers params.header]
-          ~decode:[%e decode_resp] [%e meth]]
+        let path = [%e path_parts message.req.path] in
+        let params = [%e query_params params.query] in
+        let headers = [%e extra_headers params.header] in
+        let decode = [%e response_decoder message.resp] in
+        let data = [%e data_conv] in
+        make_request [%e meth] ~base_url ~path ~params ~headers ~decode ?data
+      ]
     in
     [%stri let [%p name] = [%e fun_with_params ~data:data_pat params body]]
 

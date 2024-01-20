@@ -13,17 +13,20 @@ module Media_kind = struct
     [ `Html
     | `Json
     | `Multipart_form
+    | `Binary
     ]
 
   let to_variant_name = function
     | `Html -> "Html"
     | `Json -> "Json"
     | `Multipart_form -> "Multipart_form"
+    | `Binary -> "Binary"
 
   let of_media_type = function
     | "text/html" -> `Html
     | "application/json" -> `Json
     | "multipart/form-data" -> `Multipart_form
+    | "application/octet-stream" -> `Binary
     | media_type ->
         raise (Invalid_spec ("unsupported media type " ^ media_type))
 end
