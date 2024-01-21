@@ -15,7 +15,7 @@ let main =
     | Ok data ->
         let* () = Lwt_io.printl "list_models: OK" in
         Lwt_list.iter_s
-          (fun s -> Yojson.Safe.to_string s |> Lwt_io.printl)
+          (fun (m : Data.Model.t) -> Lwt_io.printl m.id)
           data.data
     | Error (`Request (_, s)) ->
         let* () = Lwt_io.printl "list_models: request failed" in
