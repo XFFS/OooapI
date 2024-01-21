@@ -36,9 +36,12 @@ module DataModule = struct
         | [%type: string]
         | [%type: string option] ->
           [%expr `String v]
-        | [%type: [`File of string | `String of string]]
-        | [%type: [`File of string | `String of string] option] ->
-          [%expr v]
+        | [%type: [`String of string]]
+        | [%type: [`String of string] option] ->
+          [%expr `String (string_of_str v)]
+        | [%type: [`File of string ]]
+        | [%type: [`File of string ] option] ->
+          [%expr `File (string_of_file v)]
         | _ ->
           raise (Unsupported ("unsupported type for field '" ^ pld_name.txt ^ "' of multipart form"))
         in
@@ -59,7 +62,7 @@ module DataModule = struct
         let fun_def: expression = AstExt.Exp.f [%pat? t] body in
         [%stri
           let to_multipart
-            : t -> (string * [`String of string | `File of string]) list
+            : t -> (string * [> `String of string | `File of string]) list
             = [%e fun_def]
         ]
       | _ -> raise_invalid "multipart media type must be described by a record"
@@ -134,7 +137,12 @@ module DataModule = struct
                    failwith
                      ("TODO: No schema provided matching reference " ^ label))
       in
-      Ast.pmod_structure structure_items
+      let file_type_decls =
+        [ [%stri let string_of_file (`File n) = n]
+        ; [%stri let string_of_str (`String n) = n]
+        ]
+      in
+      Ast.pmod_structure (file_type_decls @ structure_items)
     in
     Ast.module_binding ~name ~expr |> Ast.pstr_module
 end
