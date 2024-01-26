@@ -24,12 +24,15 @@ yq < ./thespec.yaml > ./thespec.json
 This then also takes care of all needed dependencies!
 ** DONE Move multipart forms into data object
 ** DONE Generate OpenAPI specs from ocaml values
+** DONE Support url encoded forms
+- If in a POST then this goes in the body. We can use =Cohttp.Body.of_form=
+- If in a GET then this goes in the query param. We can use =Uri.with_query=
+** TODO Add support for application/pdf content
 ** TODO Fix all TODOs (esp. around exception raising)
 ** TODO Test on multipart forms
 Will do in Ooapi project
 ** TODO Content conversion
 https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
-** TODO Support url encoded forms
 ** TODO Automate conversion of yaml to json for specs, via yq
 ** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
 ** TODO Factor out OCaml of JSONSchema

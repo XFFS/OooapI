@@ -45,9 +45,15 @@ It may be extended to support:
 
 * Alternatives
 
-[[https://github.com/OpenAPITools/openapi-generator/][OpenAPI Generator]] includes a generator that is meant to produce OCaml client boilerplate.
+- [[https://github.com/OpenAPITools/openapi-generator/][OpenAPI Generator]] includes a generator that is meant to produce OCaml client boilerplate.
+- [[https://github.com/andrenth/ocaml-swagger][OCaml-Swagger]] is a code generator that implements Swagger 2.0 API clients in OCaml.
 
 * Motivation
+
+We did not find OCaml-Swagger until most initial work had been completed on this
+project. We were only looking for OpenAPI generation, and did not think to look
+for "swagger". That said, this library supports generation from the more recent
+OpenAPI version 3.
 
 At the time work on this library was initiated, the OCaml client generation
 supplied by OpenAPI Generator had the following documented errors:

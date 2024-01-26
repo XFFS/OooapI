@@ -76,8 +76,8 @@ module DataModule = struct
       let dependency_ordered_declarations = declarations @ [main_decl] in
       List.map (fun decl -> Ast.pstr_type Recursive [decl]) dependency_ordered_declarations
     in
-    (* TODO: NEXT add generation of "to_multipart" *)
     let to_multipart = match schema.kind with
+      | `Url_encoded_form (* The to_multipart function also works for URL encoded data to hand to oooapi_lib *)
       | `Multipart_form -> [to_multipart_fun_of_decl main_decl]
       | _ -> []
     in
@@ -268,6 +268,7 @@ module EndpointsModule = struct
       in
       { name; var; pat; optional; default; to_string; format }
 
+    (* TODO: We need to gather objects, records decls, from parameters *)
     (* TODO: Needs cleanup *)
     let of_http_spec_param : string * H.Message.Params.param -> param =
      fun (name, p) ->
@@ -281,6 +282,7 @@ module EndpointsModule = struct
           let t = Ocaml_of_json_schema.type_of_element ~qualifier:"N/A" elem |> fst in
           match t with
           | [%type: string] -> ([%expr fun x -> x], t)
+          | [%type: string list] -> ([%expr fun x -> String.concat "," x], t)
           | [%type: bool] -> ([%expr string_of_bool], t)
           | [%type: int] -> ([%expr string_of_int], t)
           | [%type: float] -> ([%expr string_of_float], t)
@@ -288,7 +290,7 @@ module EndpointsModule = struct
             (* TODO: Add support for all types? *)
             failwith
               (Printf.sprintf
-                 "parmamters of type %s not supported for param %s"
+                 "parameters of type %s not supported for param %s"
                  (string_of_core_type unsupported_typ)
                  name)
         in
@@ -346,8 +348,8 @@ module EndpointsModule = struct
     let mod_name = Camelsnakekebab.upper_camel_case mod_name in
     Ast.evar (data_module_fun_name mod_name "to_multipart")
 
+  (* TODO Generalize for any supported responses, including default *)
   let response_decoder (responses : H.Message.Responses.t) : expression =
-    (* TODO What to do with this unsupported thing? *)
     match responses |> List.assoc_opt `OK with
     | None ->
         (* TODO 200 is required only when it is the ONLY response. So need to account for others *)
@@ -363,7 +365,10 @@ module EndpointsModule = struct
             [%expr of_json_string [%e conv_fun]]
         | `Html -> [%expr fun x -> Ok x]
         | `Binary -> [%expr fun x -> Ok x]
-        | `Multipart_form -> raise (Failure "TODO responses from multipart forms not yet supported"))
+        | `Pdf -> [%expr fun x -> Ok x]
+        (* TODO Add support for decoding form responses *)
+        | `Url_encoded_form -> [%expr fun x -> Ok x]
+        | `Multipart_form -> [%expr fun x -> Ok x])
 
   let path_parts path : expression =
     path
@@ -483,6 +488,10 @@ module EndpointsModule = struct
           | `Json -> [%expr Some (`Json ([%e to_json_fun schema.name] data))]
           | `Html -> [%expr Some (`Html data)]
           | `Binary -> [%expr Some (`Binary data)]
+          | `Pdf -> [%expr Some (`Pdf data)]
+          | `Url_encoded_form ->
+            (* TODO Use Cohttp.Body.of_form *)
+            [%expr Some (`Url_encoded_form ([%e to_multipart_fun schema.name] data))]
           | `Multipart_form ->
               [%expr
                 Some (`Multipart_form ([%e to_multipart_fun schema.name] data))]

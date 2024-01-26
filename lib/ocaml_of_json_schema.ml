@@ -53,8 +53,7 @@ let rec type_of_element
   | Number _ -> [%type: float], []
   | String s -> type_of_string_specs s, []
   | Combine (comb, elems) -> type_of_combine ~qualifier (comb, elems)
-  | Def_ref path ->
-    AstExt.Type.v (AstExt.Type.constr (type_name_of_def_ref path)), []
+  | Def_ref path -> AstExt.Type.v (AstExt.Type.constr (type_name_of_def_ref path)), []
   | Monomorphic_array (e, _) ->
     let item_type_name = qualifier ^ "_item" in
     let item_type, decls = type_of_element ~qualifier:item_type_name e in

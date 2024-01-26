@@ -13,20 +13,26 @@ module Media_kind = struct
     [ `Html
     | `Json
     | `Multipart_form
+    | `Url_encoded_form
     | `Binary
+    | `Pdf
     ]
 
   let to_variant_name = function
     | `Html -> "Html"
     | `Json -> "Json"
     | `Multipart_form -> "Multipart_form"
+    | `Url_encoded_form -> "Url_encoded_form"
     | `Binary -> "Binary"
+    | `Pdf -> "Pdf"
 
   let of_media_type = function
     | "text/html" -> `Html
     | "application/json" -> `Json
     | "multipart/form-data" -> `Multipart_form
     | "application/octet-stream" -> `Binary
+    | "application/x-www-form-urlencoded" -> `Url_encoded_form
+    | "application/pdf" -> `Pdf
     | media_type ->
         raise (Invalid_spec ("unsupported media type " ^ media_type))
 end
@@ -248,9 +254,10 @@ module Message = struct
       oper.responses
       |> List.map (fun (code, (resp : O.response)) ->
              let status =
-               match
-                 code |> int_of_string_opt |> Option.map Http.Status.of_int
-               with
+               match code with
+               | "default" -> `Code (-1) (* Interpreted as a fallback for undeclared responses *)
+               | code ->
+               match code |> int_of_string_opt |> Option.map Http.Status.of_int with
                | Some s -> s
                | None ->
                    raise
