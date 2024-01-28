@@ -29,7 +29,7 @@ let main =
     let* res =
       let data =
         Data.CreateCompletionRequest.(
-          make ~model:"davinci-002" ~prompt:"You complete me" ())
+          make ~model:"davinci-002" ~prompt:(`String "You complete me") ())
       in
       Api.create_completion data
     in

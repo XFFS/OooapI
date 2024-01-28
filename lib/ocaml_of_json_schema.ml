@@ -83,19 +83,38 @@ let rec type_of_element
     let dependency_ordered_declarations = decls @ [decl] in
     (typ, dependency_ordered_declarations)
 
+(* TODO: Add full support by implementing custom JSON Ser/de
+
+   This would be required because Yojson cannot help us with a JSON value that is "untagged"
+   but could be one of many different types. *)
 and type_of_combine
   : qualifier:string -> Json_schema.combinator * Json_schema.element list
     -> (core_type * type_declaration list) =
-  let is_simple
-    : Json_schema.element -> bool
-    = fun e -> match e.kind with
-      | Null
-      | String _
-      | Integer _
-      | Number _
-      | Boolean
-      | Monomorphic_array _ -> true
-      | _ -> false
+  (* True of all the elements in the combine are the same, simple type *)
+  let are_unform_simple_type
+    : Json_schema.element list -> bool
+    = fun elems ->
+      match elems with
+      | [] -> false
+      | e::es ->
+        es
+        |> ListLabels.fold_left
+          ~init:(Some e)
+          ~f:(fun prev (e' : Json_schema.element) ->
+              match prev with
+              | None -> None
+              | Some (prev' : Json_schema.element) ->
+                match prev'.kind, e'.kind with
+                | Null, Null
+                | String _, String _
+                | Integer _, Integer _
+                | Number _, Number _
+                | Boolean, Boolean
+                | Monomorphic_array _, Monomorphic_array _
+                  -> Some e'
+                | _ -> None
+            )
+        |> Option.is_some
   in
   fun ~qualifier (comb, elems) ->
   match comb with
@@ -106,9 +125,9 @@ and type_of_combine
   match elems with
   | [] -> [%type: Yojson.Safe.t], []
   | e :: _ ->
-    if List.for_all (is_simple) elems then
+    if are_unform_simple_type elems then
       (* If all alternatives are representable vial the same simple type,
-         just give it the type of the first in the list  *)
+         just give it the type of the first in the list. *)
       type_of_element ~qualifier e
     else
       (* Otherwise, it is left untyped *)
