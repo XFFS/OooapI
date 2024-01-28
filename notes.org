@@ -37,6 +37,9 @@ https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
 ** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
 ** TODO Factor out OCaml of JSONSchema
 This should be useful on its own I guess?
+** TODO Add mock client for testing
+
+Should just allow inspecting data without making any calls over the network
 ** KILL Add generation of a dune stanza
 Not needed know that we supply a library.
 ** TODO Support operation-level server override
