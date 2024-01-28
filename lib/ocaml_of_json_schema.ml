@@ -38,10 +38,15 @@ let type_of_string_specs
     | Some "uri" -> [%type: [`String of string]] (* TODO special support for URIs? *)
     | Some fmt -> failwith ("unsupported string format " ^ fmt)
 
+
 let rec type_of_element
   : qualifier:string -> Json_schema.element -> (core_type * type_declaration list)
   =
   fun ~qualifier element ->
+  let maybe_nullable
+    : core_type -> core_type
+    = fun typ -> if element.nullable then [%type: [%t typ] option] else typ
+  in
   match (element.kind : Json_schema.element_kind) with
   (* Unsupported schemas *)
   | Id_ref _ -> failwith "unsupported: id_ref schema"
@@ -52,21 +57,24 @@ let rec type_of_element
   | Array (_, _) -> [%type: Yojson.Safe.t], []
   | Any -> [%type: Yojson.Safe.t], []
   | Null -> [%type: unit], []
-  | Boolean ->  [%type: bool], []
-  | Integer _ -> [%type: int], []
-  | Number _ -> [%type: float], []
-  | String s -> type_of_string_specs s, []
-  | Combine (comb, elems) -> type_of_combine ~qualifier (comb, elems)
+  | Boolean ->  maybe_nullable [%type: bool], []
+  | Integer _ -> maybe_nullable [%type: int], []
+  | Number _ -> maybe_nullable [%type: float], []
+  | String s -> maybe_nullable (type_of_string_specs s) , []
+  | Combine (comb, elems) ->
+    let typ, decls = type_of_combine ~qualifier (comb, elems) in
+    maybe_nullable typ, decls
   | Def_ref path ->
-    AstExt.Type.v (AstExt.Type.constr (type_name_of_def_ref path)), []
+    let typ = AstExt.Type.v (AstExt.Type.constr (type_name_of_def_ref path)) |> maybe_nullable in
+    (typ, [])
   | Monomorphic_array (e, _) ->
     let item_type_name = qualifier ^ "_item" in
     let item_type, decls = type_of_element ~qualifier:item_type_name e in
-    ([%type: [%t item_type] list], decls)
+    let typ = maybe_nullable [%type: [%t item_type] list] in
+    (typ, decls)
   | Object o ->
     let decl, decls = type_decl_of_object ~name:qualifier o in
-    let typ = AstExt.Type.v (AstExt.Type.constr qualifier) in
-    let typ = if o.nullable then [%type: [%t typ] option] else typ in
+    let typ = AstExt.Type.v (AstExt.Type.constr qualifier) |> maybe_nullable in
     let dependency_ordered_declarations = decls @ [decl] in
     (typ, dependency_ordered_declarations)
 
