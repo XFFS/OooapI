@@ -110,7 +110,6 @@ and type_of_combine
                 | Integer _, Integer _
                 | Number _, Number _
                 | Boolean, Boolean
-                | Monomorphic_array _, Monomorphic_array _
                   -> Some e'
                 | _ -> None
             )
