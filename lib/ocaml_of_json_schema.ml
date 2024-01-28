@@ -6,6 +6,10 @@ open AstUtil
    This could be thru abstract types or thru validators in constructors *)
 
 
+let is_nullable
+  : Json_schema.element -> bool
+  = fun e -> e.nullable
+
 let deriving_attrs ~is_record =
   if is_record then
     [
@@ -32,12 +36,22 @@ let type_of_string_specs
     | None -> [%type: string]
     | Some "binary" -> [%type: [`File of string ]]
     | Some "uri" -> [%type: [`String of string]] (* TODO special support for URIs? *)
-    | Some fmt -> failwith ("unsupported string format " ^ fmt)
+    | Some _ -> [%type: string] (*TODO What should we do with other random format vaules? *)
+
 
 let rec type_of_element
   : qualifier:string -> Json_schema.element -> (core_type * type_declaration list)
   =
   fun ~qualifier element ->
+  let maybe_nullable
+    : core_type -> core_type
+    = fun typ ->
+      (* Optionality of defualt values is handled  *)
+      if element.nullable && not (Option.is_some element.default) then
+        [%type: [%t typ] option]
+      else
+        typ
+  in
   match (element.kind : Json_schema.element_kind) with
   (* Unsupported schemas *)
   | Id_ref _ -> failwith "unsupported: id_ref schema"
@@ -48,21 +62,24 @@ let rec type_of_element
   | Array (_, _) -> [%type: Yojson.Safe.t], []
   | Any -> [%type: Yojson.Safe.t], []
   | Null -> [%type: unit], []
-  | Boolean ->  [%type: bool], []
-  | Integer _ -> [%type: int], []
-  | Number _ -> [%type: float], []
-  | String s -> type_of_string_specs s, []
-  | Combine (comb, elems) -> type_of_combine ~qualifier (comb, elems)
+  | Boolean ->  maybe_nullable [%type: bool], []
+  | Integer _ -> maybe_nullable [%type: int], []
+  | Number _ -> maybe_nullable [%type: float], []
+  | String s -> maybe_nullable (type_of_string_specs s) , []
+  | Combine (comb, elems) ->
+    let typ, decls = type_of_combine ~qualifier (comb, elems) in
+    maybe_nullable typ, decls
   | Def_ref path ->
-    AstExt.Type.v (AstExt.Type.constr (type_name_of_def_ref path)), []
+    let typ = AstExt.Type.v (AstExt.Type.constr (type_name_of_def_ref path)) |> maybe_nullable in
+    (typ, [])
   | Monomorphic_array (e, _) ->
     let item_type_name = qualifier ^ "_item" in
     let item_type, decls = type_of_element ~qualifier:item_type_name e in
-    ([%type: [%t item_type] list], decls)
+    let typ = maybe_nullable [%type: [%t item_type] list] in
+    (typ, decls)
   | Object o ->
     let decl, decls = type_decl_of_object ~name:qualifier o in
-    let typ = AstExt.Type.v (AstExt.Type.constr qualifier) in
-    let typ = if o.nullable then [%type: [%t typ] option] else typ in
+    let typ = AstExt.Type.v (AstExt.Type.constr qualifier) |> maybe_nullable in
     let dependency_ordered_declarations = decls @ [decl] in
     (typ, dependency_ordered_declarations)
 
@@ -99,16 +116,24 @@ and record_label
     in
     let key_attr =
       (* ppx_json_conv *)
-      [ AstExt.attr_str ~name:"key" field_name ]
+      [ AstExt.attr_str ~name:"yojson.key" field_name ]
     in
-    let qualifier_attrs =
-      if required then (* ppx_make *)
-        [ AstExt.attr ~name:"required" ]
+    let make_attrs =
+      (* Even if a field is required, when it is nullable, end-users of the generated library
+         can omit the argument in the [make] function to have a [None] supplied*)
+      if required && not (is_nullable element) then
+        [ AstExt.attr ~name:"make.required" ]
+      else
+        []
+    in
+    let yojson_attrs =
+      if required then
+        []
       else
         (* ppx_json_conv *)
         [ AstExt.attr_ident ~name:"yojson.default" "None" ]
     in
-    doc_attr @ key_attr @ qualifier_attrs
+    doc_attr @ key_attr @ make_attrs @ yojson_attrs
   in
   let pld_name =
     if String.equal type_name "t" then n fname

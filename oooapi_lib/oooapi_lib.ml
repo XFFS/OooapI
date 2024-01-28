@@ -101,6 +101,7 @@ module type Client = functor (_ : Config) -> sig
   type data =
     [ `Json of Yojson.Safe.t
     | `Multipart_form of Multipart.part_data list
+    | `Url_encoded_form of Multipart.part_data list
     ]
 
   type request_err =
@@ -124,6 +125,8 @@ module type Client = functor (_ : Config) -> sig
 end
 
 module Cohttp_client : Client = functor (Config : Config) -> struct
+  exception Unsupported of string
+
   let default_headers =
     let headers =
       match Config.default_headers with
@@ -144,7 +147,15 @@ module Cohttp_client : Client = functor (Config : Config) -> struct
   type data =
     [ `Json of Yojson.Safe.t
     | `Multipart_form of Multipart.part_data list
+    | `Url_encoded_form of Multipart.part_data list
     ]
+
+  let url_form_data_of_multipart_data
+    : Multipart.part_data list -> (string * string list) list
+    = fun parts ->
+      parts |>
+      List.map (function | (label, `String value) -> (label, [value])
+                         | (field, `File _) -> raise (Unsupported ("`File value not supported in url-encoded form, but specified for field" ^ field)))
 
   let of_json_string f s = f (Yojson.Safe.from_string s)
 
@@ -157,25 +168,37 @@ module Cohttp_client : Client = functor (Config : Config) -> struct
       ~(decode : string -> ('resp, string) result)
       (meth : Cohttp.Code.meth) : 'resp request_result =
     let open Lwt.Syntax in
-    let* body, content_headers =
-      match data with
-      | None -> Lwt.return (None, [])
-      | Some (`Json data_json) ->
-          let data_str = Yojson.Safe.to_string data_json in
-          let data_body = Cohttp_lwt.Body.of_string data_str in
-          Lwt.return (Some data_body, [ ("Content-Type", "application/json") ])
-      | Some (`Multipart_form data_parts) ->
-          let* form = Multipart.form_of_data data_parts in
-          let headers, data_body =
-            Multipart_form_cohttp.Client.multipart_form form
-          in
-          Lwt.return (Some data_body, Cohttp.Header.to_list headers)
-    in
     let uri =
       let path_parts = base_url :: path in
       let uri_str = String.concat "/" path_parts in
       let base_uri = Uri.of_string uri_str in
       Uri.add_query_params' base_uri params
+    in
+    let* (body, content_headers, uri) =
+      match data with
+      | None -> Lwt.return (None, [], uri)
+      | Some (`Json data_json) ->
+          let data_str = Yojson.Safe.to_string data_json in
+          let data_body = Cohttp_lwt.Body.of_string data_str in
+          Lwt.return (Some data_body, [ ("Content-Type", "application/json") ], uri)
+      | Some (`Multipart_form data_parts) ->
+          let* form = Multipart.form_of_data data_parts in
+          let headers, data_body =
+            Multipart_form_cohttp.Client.multipart_form form
+          in
+          Lwt.return (Some data_body, Cohttp.Header.to_list headers, uri)
+      | Some (`Url_encoded_form data_parts) ->
+        let fields = url_form_data_of_multipart_data data_parts in
+        match meth with
+        | `GET ->
+          let uri = Uri.with_query uri fields in
+          Lwt.return (None, [("Content-Type", "application/x-www-form-urlencoded")], uri)
+        | `POST ->
+          let data_body = Cohttp_lwt.Body.of_form fields in
+          Lwt.return (Some data_body, [("Content-Type", "application/x-www-form-urlencoded")], uri)
+        | _ ->
+          raise (Unsupported ("application/x-www-form-urlencoded specified for non POST or GET request"))
+
     in
     let req_headers =
       Cohttp.Header.add_list default_headers (headers @ content_headers)

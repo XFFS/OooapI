@@ -42,8 +42,13 @@ module DataModule = struct
         | [%type: [`File of string ]]
         | [%type: [`File of string ] option] ->
           [%expr `File (string_of_file v)]
-        | _ ->
-          raise (Unsupported ("unsupported type for field '" ^ pld_name.txt ^ "' of multipart form"))
+        | typ ->
+          let msg =
+            Format.asprintf "unsupported type for field '%s' of multipart form: %a"
+              pld_name.txt
+              Astlib.Pprintast.core_type typ
+          in
+          raise (Unsupported (msg))
         in
         (* TODO: We should actually construct two different parts:
            one for the optional one for required *)
@@ -70,15 +75,22 @@ module DataModule = struct
   let data_module_of_schema_entry : string * Http_spec.schema -> structure_item
       =
    fun (name, schema) ->
-    let name = n (Some (Camelsnakekebab.upper_camel_case name)) in
+    let name_str = Camelsnakekebab.upper_camel_case name in
+    let name = n (Some name_str) in
     let main_decl, declarations = Ocaml_of_json_schema.type_declarations schema.schema.schema in
     let type_declarations =
       let dependency_ordered_declarations = declarations @ [main_decl] in
       List.map (fun decl -> Ast.pstr_type Recursive [decl]) dependency_ordered_declarations
     in
-    (* TODO: NEXT add generation of "to_multipart" *)
     let to_multipart = match schema.kind with
-      | `Multipart_form -> [to_multipart_fun_of_decl main_decl]
+      | `Url_encoded_form (* The to_multipart function also works for URL encoded data to hand to oooapi_lib *)
+      | `Multipart_form ->
+        let f_exp =
+          try to_multipart_fun_of_decl main_decl
+          with Unsupported err ->
+            raise (Unsupported (name_str ^ ": " ^ err))
+        in
+        [f_exp]
       | _ -> []
     in
     let expr = Ast.pmod_structure (type_declarations @ to_multipart) in
@@ -234,40 +246,7 @@ module EndpointsModule = struct
           (* Otherwise let it be the first thing it could be *)
           | _ -> string_conv_and_format_of_elem_kind (List.hd elems).kind)
 
-    let param_of_element :
-        name:string -> optional:bool -> Json_schema.element -> param =
-     fun ~name ~optional elem ->
-      let var = Ast.evar (AstExt.to_identifier name) in
-      let pat = Ast.pvar (AstExt.to_identifier name) in
-      let to_string, format = string_conv_and_format_of_elem_kind elem.kind in
-      let default =
-        elem.default
-        |> Option.map (Json_repr.any_to_repr (module Json_repr.Yojson))
-        |> Option.map (function
-             | `String s -> Ast.estring s
-             | `Bool b -> Ast.ebool b
-             | `Int i -> (
-                 (* JS doesn't distinguish between `Number` "types", so we have be sure we
-                    decode the default correctly in case it is given in an integer form when
-                    it should be a float. *)
-                 match elem.kind with
-                 | Integer _ -> Ast.eint i
-                 | Number _ -> Ast.efloat (string_of_float (float_of_int i))
-                 | _ ->
-                     raise
-                       (Invalid_data
-                          "Numerical value given as default for schema \
-                           specifying non-numerical type"))
-             | `Float f -> Ast.efloat (string_of_float f)
-             | unsupported_default ->
-                 failwith
-                   (Printf.sprintf
-                      "default value %s not supported for parameter  %s"
-                      (Yojson.Safe.to_string unsupported_default)
-                      name))
-      in
-      { name; var; pat; optional; default; to_string; format }
-
+    (* TODO: We need to gather objects, records decls, from parameters *)
     (* TODO: Needs cleanup *)
     let of_http_spec_param : string * H.Message.Params.param -> param =
      fun (name, p) ->
@@ -278,19 +257,20 @@ module EndpointsModule = struct
         let schema = p.schema.schema.schema in
         let elem = Json_schema.root schema in
         let to_string, typ =
-          let t = Ocaml_of_json_schema.type_of_element ~qualifier:"N/A" elem |> fst in
+          let t = Ocaml_of_json_schema.type_of_element ~qualifier:"not_applicable____" elem |> fst in
           match t with
+          (* TODO: Add support for all types *)
           | [%type: string] -> ([%expr fun x -> x], t)
+          | [%type: string list] -> ([%expr fun x -> String.concat "," x], t)
           | [%type: bool] -> ([%expr string_of_bool], t)
           | [%type: int] -> ([%expr string_of_int], t)
           | [%type: float] -> ([%expr string_of_float], t)
           | unsupported_typ ->
-            (* TODO: Add support for all types? *)
-            failwith
-              (Printf.sprintf
-                 "parmamters of type %s not supported for param %s"
-                 (string_of_core_type unsupported_typ)
-                 name)
+            (Printf.eprintf
+               "ERROR: parameters of type %s not supported for parameter %s, using JSON as fallback. This is probably invalid\n"
+               (string_of_core_type unsupported_typ)
+               name);
+            ([%expr Yojson.Safe.to_string], [%type: Yojson.Safe.t])
         in
         let default =
           elem.default
@@ -346,8 +326,8 @@ module EndpointsModule = struct
     let mod_name = Camelsnakekebab.upper_camel_case mod_name in
     Ast.evar (data_module_fun_name mod_name "to_multipart")
 
+  (* TODO Generalize for any supported responses, including default *)
   let response_decoder (responses : H.Message.Responses.t) : expression =
-    (* TODO What to do with this unsupported thing? *)
     match responses |> List.assoc_opt `OK with
     | None ->
         (* TODO 200 is required only when it is the ONLY response. So need to account for others *)
@@ -363,7 +343,10 @@ module EndpointsModule = struct
             [%expr of_json_string [%e conv_fun]]
         | `Html -> [%expr fun x -> Ok x]
         | `Binary -> [%expr fun x -> Ok x]
-        | `Multipart_form -> raise (Failure "TODO responses from multipart forms not yet supported"))
+        | `Pdf -> [%expr fun x -> Ok x]
+        (* TODO Add support for decoding form responses *)
+        | `Url_encoded_form -> [%expr fun x -> Ok x]
+        | `Multipart_form -> [%expr fun x -> Ok x])
 
   let path_parts path : expression =
     path
@@ -483,6 +466,10 @@ module EndpointsModule = struct
           | `Json -> [%expr Some (`Json ([%e to_json_fun schema.name] data))]
           | `Html -> [%expr Some (`Html data)]
           | `Binary -> [%expr Some (`Binary data)]
+          | `Pdf -> [%expr Some (`Pdf data)]
+          | `Url_encoded_form ->
+            (* TODO Use Cohttp.Body.of_form *)
+            [%expr Some (`Url_encoded_form ([%e to_multipart_fun schema.name] data))]
           | `Multipart_form ->
               [%expr
                 Some (`Multipart_form ([%e to_multipart_fun schema.name] data))]

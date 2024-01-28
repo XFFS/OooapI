@@ -50,6 +50,7 @@ and element =
   ; default : Json_repr.any option
   ; enum : Json_repr.any list option
   ; kind : element_kind
+  ; nullable : bool
   ; format : string option
   ; id : string option
   }
@@ -116,6 +117,7 @@ let element kind =
   ; description = None
   ; default = None
   ; kind
+  ; nullable = false
   ; format = None
   ; enum = None
   ; id = None
@@ -1035,6 +1037,7 @@ module Make (Repr : Json_repr.Repr) = struct
         (* combine all specifications under a big conjunction *)
         let as_one_of = as_nary "oneOf" One_of [] in
         let as_any_of = as_nary "anyOf" Any_of [] in
+        let nullable = opt_bool_field false json "nullable" in
         let cases =
           let ( @? ) o xs =
             match o with
@@ -1050,7 +1053,7 @@ module Make (Repr : Json_repr.Repr) = struct
           | Some { kind } -> kind
         in
         (* add optional fields *)
-        { title; description; default; format; kind; enum; id }
+        { title; description; default; format; nullable; kind; enum; id }
     and parse_element_kind source json name =
       let integer_specs json =
         let multiple_of = opt_int_field json "multipleOf" in
