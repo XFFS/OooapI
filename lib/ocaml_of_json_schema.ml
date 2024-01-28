@@ -99,11 +99,11 @@ and record_label
     in
     let key_attr =
       (* ppx_json_conv *)
-      [ AstExt.attr_str ~name:"key" field_name ]
+      [ AstExt.attr_str ~name:"yojson.key" field_name ]
     in
     let qualifier_attrs =
       if required then (* ppx_make *)
-        [ AstExt.attr ~name:"required" ]
+        [ AstExt.attr ~name:"make.required" ]
       else
         (* ppx_json_conv *)
         [ AstExt.attr_ident ~name:"yojson.default" "None" ]
