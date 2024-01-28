@@ -42,6 +42,8 @@ It may be extended to support:
   or binary data.
 - Anything that goes in the path, query parameters, or headers, is passed via
   arguments to an operation function.
+- Try to fail gracefully: JSON Schemas that are too complicated for us to
+  support currently should degrade to untyped json.
 
 * Alternatives
 
