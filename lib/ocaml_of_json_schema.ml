@@ -101,9 +101,15 @@ and record_label
       (* ppx_json_conv *)
       [ AstExt.attr_str ~name:"yojson.key" field_name ]
     in
-    let qualifier_attrs =
-      if required then (* ppx_make *)
+    let make_attrs = 
+      if required && not (element.nullable) then (* ppx_make *)
         [ AstExt.attr ~name:"make.required" ]
+      else
+        []
+    in
+    let yojosn_attrs =
+      if required then
+        []
       else
         (* ppx_json_conv *)
         [ AstExt.attr_ident ~name:"yojson.default" "None" ]
