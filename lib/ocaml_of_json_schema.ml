@@ -6,6 +6,10 @@ open AstUtil
    This could be thru abstract types or thru validators in constructors *)
 
 
+let is_nullable
+  : Json_schema.element -> bool
+  = fun e -> e.nullable
+
 let deriving_attrs ~is_record =
   if is_record then
     [
@@ -101,20 +105,22 @@ and record_label
       (* ppx_json_conv *)
       [ AstExt.attr_str ~name:"yojson.key" field_name ]
     in
-    let make_attrs = 
-      if required && not (element.nullable) then (* ppx_make *)
+    let make_attrs =
+      (* Even if a field is required, when it is nullable, end-users of the generated library
+         can omit the argument in the [make] function to have a [None] supplied*)
+      if required && not (is_nullable element) then
         [ AstExt.attr ~name:"make.required" ]
       else
         []
     in
-    let yojosn_attrs =
+    let yojson_attrs =
       if required then
         []
       else
         (* ppx_json_conv *)
         [ AstExt.attr_ident ~name:"yojson.default" "None" ]
     in
-    doc_attr @ key_attr @ qualifier_attrs
+    doc_attr @ key_attr @ make_attrs @ yojson_attrs
   in
   let pld_name =
     if String.equal type_name "t" then n fname

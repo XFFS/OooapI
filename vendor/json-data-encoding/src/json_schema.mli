@@ -37,6 +37,7 @@ and element =
   ; enum : Json_repr.any list option
         (** A valid value must equal one of these constants. *)
   ; kind : element_kind  (** The type-specific part. *)
+  ; nullable : bool (** True of the element in nullable *)
   ; format : string option
         (** predefined formats such as [date-time], [email], [ipv4], [ipv6], [uri]. *)
   ; id : string option  (** An optional ID. *)
