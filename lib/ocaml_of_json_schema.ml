@@ -45,7 +45,10 @@ let rec type_of_element
   fun ~qualifier element ->
   let maybe_nullable
     : core_type -> core_type
-    = fun typ -> if element.nullable then [%type: [%t typ] option] else typ
+    = fun typ -> if element.nullable && not (Option.is_some element.default) then
+        [%type: [%t typ] option]
+      else
+        typ
   in
   match (element.kind : Json_schema.element_kind) with
   (* Unsupported schemas *)
