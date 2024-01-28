@@ -117,7 +117,10 @@ module AstExt = struct
 
         E.g., [constr "Foo" [int, str]] makes the type constructor [(int, str) Foo] *)
     let constr ?(args = []) name =
-      Ptyp_constr (n (Astlib.Longident.parse name), args)
+      try
+        Ptyp_constr (n (Astlib.Longident.parse name), args)
+      with Syntaxerr.Error _ ->
+        Format.sprintf "Attempted to build type of invalid name '%s'" name |> failwith
 
 
     (** A type declaration *)

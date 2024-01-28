@@ -257,20 +257,20 @@ module EndpointsModule = struct
         let schema = p.schema.schema.schema in
         let elem = Json_schema.root schema in
         let to_string, typ =
-          let t = Ocaml_of_json_schema.type_of_element ~qualifier:"N/A" elem |> fst in
+          let t = Ocaml_of_json_schema.type_of_element ~qualifier:"not_applicable____" elem |> fst in
           match t with
+          (* TODO: Add support for all types *)
           | [%type: string] -> ([%expr fun x -> x], t)
           | [%type: string list] -> ([%expr fun x -> String.concat "," x], t)
           | [%type: bool] -> ([%expr string_of_bool], t)
           | [%type: int] -> ([%expr string_of_int], t)
           | [%type: float] -> ([%expr string_of_float], t)
           | unsupported_typ ->
-            (* TODO: Add support for all types? *)
-            failwith
-              (Printf.sprintf
-                 "parameters of type %s not supported for param %s"
-                 (string_of_core_type unsupported_typ)
-                 name)
+            (Printf.eprintf
+               "ERROR: parameters of type %s not supported for parameter %s, using JSON as fallback. This is probably invalid\n"
+               (string_of_core_type unsupported_typ)
+               name);
+            ([%expr Yojson.Safe.to_string], [%type: Yojson.Safe.t])
         in
         let default =
           elem.default

@@ -36,7 +36,7 @@ let type_of_string_specs
     | None -> [%type: string]
     | Some "binary" -> [%type: [`File of string ]]
     | Some "uri" -> [%type: [`String of string]] (* TODO special support for URIs? *)
-    | Some fmt -> failwith ("unsupported string format " ^ fmt)
+    | Some _ -> [%type: string] (*TODO What should we do with other random format vaules? *)
 
 
 let rec type_of_element
@@ -45,7 +45,9 @@ let rec type_of_element
   fun ~qualifier element ->
   let maybe_nullable
     : core_type -> core_type
-    = fun typ -> if element.nullable && not (Option.is_some element.default) then
+    = fun typ ->
+      (* Optionality of defualt values is handled  *)
+      if element.nullable && not (Option.is_some element.default) then
         [%type: [%t typ] option]
       else
         typ
