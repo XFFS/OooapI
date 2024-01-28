@@ -59,7 +59,7 @@ let rec type_of_element
   | Dummy -> failwith "unsupported: dummy schema"
   (* Supported schemas *)
   (* TODO: If min and max items are equal, Array can be a tuple *)
-  | Array (_, _) -> [%type: Yojson.Safe.t], []
+  | Array (_, _) -> [%type: Yojson.Safe.t list], []
   | Any -> [%type: Yojson.Safe.t], []
   | Null -> [%type: unit], []
   | Boolean ->  maybe_nullable [%type: bool], []
@@ -86,18 +86,33 @@ let rec type_of_element
 and type_of_combine
   : qualifier:string -> Json_schema.combinator * Json_schema.element list
     -> (core_type * type_declaration list) =
+  let is_simple
+    : Json_schema.element -> bool
+    = fun e -> match e.kind with
+      | Null
+      | String _
+      | Integer _
+      | Number _
+      | Boolean
+      | Monomorphic_array _ -> true
+      | _ -> false
+  in
   fun ~qualifier (comb, elems) ->
   match comb with
-  | Json_schema.All_of | Json_schema.Not -> [%type: Yojson.Safe.t], []
-  | Json_schema.Any_of | Json_schema.One_of ->
-    match
-      elems |> List.find_opt (function | Json_schema.{ kind = String _; _ } -> true | _ -> false)
-    with
-    (* If it can be a string, let it be a string *)
-    | Some s -> type_of_element ~qualifier s
-    (* Otherwise let it be the first thing it could be *)
-    (* TODO What if elems is empty? *)
-    | _ -> type_of_element ~qualifier (List.hd elems)
+  | Json_schema.Not -> [%type: Yojson.Safe.t], []
+  | Json_schema.All_of
+  | Json_schema.Any_of
+  | Json_schema.One_of ->
+  match elems with
+  | [] -> [%type: Yojson.Safe.t], []
+  | e :: _ ->
+    if List.for_all (is_simple) elems then
+      (* If all alternatives are representable vial the same simple type,
+         just give it the type of the first in the list  *)
+      type_of_element ~qualifier e
+    else
+      (* Otherwise, it is left untyped *)
+      [%type: Yojson.Safe.t], []
 
 and record_label
   : type_name:string -> string * Json_schema.element * bool * _ -> label_declaration * type_declaration list =

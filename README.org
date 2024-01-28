@@ -8,7 +8,7 @@ spec:'OpenAPI spec' -> 'client library for'(spec):OCaml
 
 * Overview
 
-OooapI[fn:1] is OCaml of (and for) OpenAPI specs.
+OooapI[fn:1] is OCaml of (and for) OpenAPI 3.0 specs.
 
 OooapI currently supports:
 
@@ -47,6 +47,13 @@ It may be extended to support:
 
 - [[https://github.com/OpenAPITools/openapi-generator/][OpenAPI Generator]] includes a generator that is meant to produce OCaml client boilerplate.
 - [[https://github.com/andrenth/ocaml-swagger][OCaml-Swagger]] is a code generator that implements Swagger 2.0 API clients in OCaml.
+
+* Known Limitations
+
+** JSON Schema:
+- Limited support for JSON Schema's =oneOf=, =anyOf=, =allOf=, and
+  =not=. Only uniform simple types (string, numerics, monomorphic) arrays are
+  supported. Anything else is treated as untyped JSON.
 
 * Motivation
 

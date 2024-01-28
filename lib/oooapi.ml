@@ -42,6 +42,9 @@ module DataModule = struct
         | [%type: [`File of string ]]
         | [%type: [`File of string ] option] ->
           [%expr `File (string_of_file v)]
+        | [%type: Yojson.Safe.t]
+        | [%type: Yojson.Safe.t option] ->
+          [%expr `String (Yojson.Safe.to_string v)]
         | typ ->
           let msg =
             Format.asprintf "unsupported type for field '%s' of multipart form: %a"
@@ -183,68 +186,68 @@ module EndpointsModule = struct
     let empty = { query = []; path = []; header = []; cookie = [] }
     let to_list { query; path; header; cookie } = query @ path @ header @ cookie
 
-    let rec string_conv_and_format_of_elem_kind :
-        Json_schema.element_kind -> expression * string option = function
-      (* Unsupported schemas *)
-      | Id_ref _ ->
-          raise
-            (Invalid_argument
-               "string_conv_and_format_of_elem_kind given id_ref schema")
-      | Ext_ref _ ->
-          raise
-            (Invalid_argument
-               "string_conv_and_format_of_elem_kind given ext_ref schema")
-      | Dummy ->
-          raise
-            (Invalid_argument
-               "string_conv_and_format_of_elem_kind given dummy schema")
-      | Array (_, _) ->
-          raise
-            (Invalid_argument
-               "string_conv_and_format_of_elem_kind given het-array")
-      | Object _ ->
-          raise
-            (Invalid_argument "string_conv_and_format_of_elem_kind given object")
-      | Def_ref _ ->
-          raise
-            (Invalid_argument
-               "string_conv_and_format_of_elem_kind given def-ref")
-      | Monomorphic_array (_, _) ->
-          (* TODO Why are we not currently supporting array? *)
-          raise
-            (Invalid_argument "string_conv_and_format_of_elem_kind given array")
-      | Any ->
-          (* TODO Why not accept JSON here? *)
-          raise
-            (Invalid_argument "string_conv_and_format_of_elem_kind given any")
-      (* Supported schemas *)
-      | Null -> ([%expr fun _ -> "null"], None)
-      | Boolean -> ([%expr string_of_bool], None)
-      | Integer _ -> ([%expr string_of_int], None)
-      | Number _ -> ([%expr string_of_float], None)
-      | String s -> ([%expr fun x -> x], s.str_format)
-      | Combine (_, []) ->
-          raise
-            (Invalid_argument
-               "param_of_json_schema_element given combine with empty types")
-      | Combine (Json_schema.All_of, _) ->
-          raise
-            (Invalid_argument
-               "param_of_json_schema_element given combine all_of")
-      | Combine (Json_schema.Not, _) ->
-          raise
-            (Invalid_argument "param_of_json_schema_element given combine not")
-      | Combine ((One_of | Any_of), elems) -> (
-          (* If it can be a string, let it be a string *)
-          match
-            elems
-            |> List.find_opt (function
-                 | Json_schema.{ kind = String _; _ } -> true
-                 | _ -> false)
-          with
-          | Some s -> string_conv_and_format_of_elem_kind s.kind
-          (* Otherwise let it be the first thing it could be *)
-          | _ -> string_conv_and_format_of_elem_kind (List.hd elems).kind)
+    (* let rec string_conv_and_format_of_elem_kind : *)
+    (*     Json_schema.element_kind -> expression * string option = function *)
+    (*   (\* Unsupported schemas *\) *)
+    (*   | Id_ref _ -> *)
+    (*       raise *)
+    (*         (Invalid_argument *)
+    (*            "string_conv_and_format_of_elem_kind given id_ref schema") *)
+    (*   | Ext_ref _ -> *)
+    (*       raise *)
+    (*         (Invalid_argument *)
+    (*            "string_conv_and_format_of_elem_kind given ext_ref schema") *)
+    (*   | Dummy -> *)
+    (*       raise *)
+    (*         (Invalid_argument *)
+    (*            "string_conv_and_format_of_elem_kind given dummy schema") *)
+    (*   | Array (_, _) -> *)
+    (*       raise *)
+    (*         (Invalid_argument *)
+    (*            "string_conv_and_format_of_elem_kind given het-array") *)
+    (*   | Object _ -> *)
+    (*       raise *)
+    (*         (Invalid_argument "string_conv_and_format_of_elem_kind given object") *)
+    (*   | Def_ref _ -> *)
+    (*       raise *)
+    (*         (Invalid_argument *)
+    (*            "string_conv_and_format_of_elem_kind given def-ref") *)
+    (*   | Monomorphic_array (_, _) -> *)
+    (*       (\* TODO Why are we not currently supporting array? *\) *)
+    (*       raise *)
+    (*         (Invalid_argument "string_conv_and_format_of_elem_kind given array") *)
+    (*   | Any -> *)
+    (*       (\* TODO Why not accept JSON here? *\) *)
+    (*       raise *)
+    (*         (Invalid_argument "string_conv_and_format_of_elem_kind given any") *)
+    (*   (\* Supported schemas *\) *)
+    (*   | Null -> ([%expr fun _ -> "null"], None) *)
+    (*   | Boolean -> ([%expr string_of_bool], None) *)
+    (*   | Integer _ -> ([%expr string_of_int], None) *)
+    (*   | Number _ -> ([%expr string_of_float], None) *)
+    (*   | String s -> ([%expr fun x -> x], s.str_format) *)
+    (*   | Combine (_, []) -> *)
+    (*       raise *)
+    (*         (Invalid_argument *)
+    (*            "param_of_json_schema_element given combine with empty types") *)
+    (*   | Combine (Json_schema.All_of, _) -> *)
+    (*       raise *)
+    (*         (Invalid_argument *)
+    (*            "param_of_json_schema_element given combine all_of") *)
+    (*   | Combine (Json_schema.Not, _) -> *)
+    (*       raise *)
+    (*         (Invalid_argument "param_of_json_schema_element given combine not") *)
+    (*   | Combine ((One_of | Any_of), elems) -> ( *)
+    (*       (\* If it can be a string, let it be a string *\) *)
+    (*       match *)
+    (*         elems *)
+    (*         |> List.find_opt (function *)
+    (*              | Json_schema.{ kind = String _; _ } -> true *)
+    (*              | _ -> false) *)
+    (*       with *)
+    (*       | Some s -> string_conv_and_format_of_elem_kind s.kind *)
+    (*       (\* Otherwise let it be the first thing it could be *\) *)
+    (*       | _ -> string_conv_and_format_of_elem_kind (List.hd elems).kind) *)
 
     (* TODO: We need to gather objects, records decls, from parameters *)
     (* TODO: Needs cleanup *)
