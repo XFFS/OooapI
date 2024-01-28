@@ -42,8 +42,13 @@ module DataModule = struct
         | [%type: [`File of string ]]
         | [%type: [`File of string ] option] ->
           [%expr `File (string_of_file v)]
-        | _ ->
-          raise (Unsupported ("unsupported type for field '" ^ pld_name.txt ^ "' of multipart form"))
+        | typ ->
+          let msg =
+            Format.asprintf "unsupported type for field '%s' of multipart form: %a"
+              pld_name.txt
+              Astlib.Pprintast.core_type typ
+          in
+          raise (Unsupported (msg))
         in
         (* TODO: We should actually construct two different parts:
            one for the optional one for required *)
@@ -70,7 +75,8 @@ module DataModule = struct
   let data_module_of_schema_entry : string * Http_spec.schema -> structure_item
       =
    fun (name, schema) ->
-    let name = n (Some (Camelsnakekebab.upper_camel_case name)) in
+    let name_str = Camelsnakekebab.upper_camel_case name in
+    let name = n (Some name_str) in
     let main_decl, declarations = Ocaml_of_json_schema.type_declarations schema.schema.schema in
     let type_declarations =
       let dependency_ordered_declarations = declarations @ [main_decl] in
@@ -78,7 +84,13 @@ module DataModule = struct
     in
     let to_multipart = match schema.kind with
       | `Url_encoded_form (* The to_multipart function also works for URL encoded data to hand to oooapi_lib *)
-      | `Multipart_form -> [to_multipart_fun_of_decl main_decl]
+      | `Multipart_form ->
+        let f_exp =
+          try to_multipart_fun_of_decl main_decl
+          with Unsupported err ->
+            raise (Unsupported (name_str ^ ": " ^ err))
+        in
+        [f_exp]
       | _ -> []
     in
     let expr = Ast.pmod_structure (type_declarations @ to_multipart) in
@@ -233,40 +245,6 @@ module EndpointsModule = struct
           | Some s -> string_conv_and_format_of_elem_kind s.kind
           (* Otherwise let it be the first thing it could be *)
           | _ -> string_conv_and_format_of_elem_kind (List.hd elems).kind)
-
-    let param_of_element :
-        name:string -> optional:bool -> Json_schema.element -> param =
-     fun ~name ~optional elem ->
-      let var = Ast.evar (AstExt.to_identifier name) in
-      let pat = Ast.pvar (AstExt.to_identifier name) in
-      let to_string, format = string_conv_and_format_of_elem_kind elem.kind in
-      let default =
-        elem.default
-        |> Option.map (Json_repr.any_to_repr (module Json_repr.Yojson))
-        |> Option.map (function
-             | `String s -> Ast.estring s
-             | `Bool b -> Ast.ebool b
-             | `Int i -> (
-                 (* JS doesn't distinguish between `Number` "types", so we have be sure we
-                    decode the default correctly in case it is given in an integer form when
-                    it should be a float. *)
-                 match elem.kind with
-                 | Integer _ -> Ast.eint i
-                 | Number _ -> Ast.efloat (string_of_float (float_of_int i))
-                 | _ ->
-                     raise
-                       (Invalid_data
-                          "Numerical value given as default for schema \
-                           specifying non-numerical type"))
-             | `Float f -> Ast.efloat (string_of_float f)
-             | unsupported_default ->
-                 failwith
-                   (Printf.sprintf
-                      "default value %s not supported for parameter  %s"
-                      (Yojson.Safe.to_string unsupported_default)
-                      name))
-      in
-      { name; var; pat; optional; default; to_string; format }
 
     (* TODO: We need to gather objects, records decls, from parameters *)
     (* TODO: Needs cleanup *)
