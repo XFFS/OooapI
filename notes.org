@@ -1,5 +1,54 @@
 #+title: Notes
 
+* On OpenAPI and JSON Schema
+** tl;dr
+
+A good specification language should enable correct, unambiguous, and reasonable
+specification of correct, unambiguous, and reasonable system.
+
+OpenAPI and JSON Schema are very expressive, but they encourage unreasonable,
+ambiguous, and incorrect specification of unreasonable, ambiguous, and incorrect
+systems.
+
+** Criticism and complaints from across the web
+- OpenAPI and JSON Schema are not suitable for code generation :: https://github.com/OAI/OpenAPI-Specification/issues/1982
+- OpenAPI and JSON Schema are not suitable for writing specifications  :: https://dizzy.zone/2018/02/24/Why-I-hate-swagger/
+- Tooling that attempts to generate based on OpenAPI is brittle and unreliable ::
+  https://github.com/OpenAPITools/openapi-generator/issues/7490
+- Misc gripes ::
+  - https://news.ycombinator.com/item?id=36145131
+  - https://levelup.gitconnected.com/whats-wrong-with-openapi-771e67e2bf6f
+
+** =parameters= for an endpoint can be specified in two different ways, and consumers of a spec are responsible for detecting overrides
+This amounts to an ad hoc, bizarre method of doing inheritance.
+
+See the =parameters= property in these places
+
+- https://spec.openapis.org/oas/latest.html#operationObject
+- https://spec.openapis.org/oas/latest.html#path-item-object
+** Specification of OpenAPI references are inconsistent and nonsensical
+Most objects that can be referenced do so by having a union type on the schema.
+E.g., =Header Object | Reference Object= is either a header object or a
+reference object.
+
+But for https://spec.openapis.org/oas/latest.html#pathItemObject, this
+alternative is indicated by an optional field on the object `$ref`, and a
+warning that if this field is used along with the other fields, the meaning is
+undefined. That is, each path item object has a field `$ref` that can refers to
+a path item object (wtf?), and if it does and any other fields are used, you
+have undefined semantics in your spec. This could be avoided by using a union
+type here as they do everywhere else.
+
+Worse: in the https://spec.openapis.org/oas/latest.html#componentsObject, the
+=pathItems= which can hold the referents for a referenced path items object has
+the type =Path Item Object | Reference Object=, so the reference can go to
+another reference, or to a path item object which can itself have reference in a
+different way.
+
+** Treatment of fields is inconsistent
+E.g., the =description= field is, for no noted reason, required for =response
+objects=, while it is optional for (nearly?) every other object.
+
 * Constructing OCaml
 
 For constructing OCaml
@@ -44,33 +93,3 @@ Should just allow inspecting data without making any calls over the network
 Not needed know that we supply a library.
 ** TODO Support operation-level server override
 See the server field in https://spec.openapis.org/oas/latest.html#fixed-fields-7
-* On OpenAPI and JSON Schema
-** =parameters= for an endpoint can be specified in two different ways, and consumers of a spec are responsible for detecting overrides
-This amounts to an ad hoc, bizarre method of doing inheritance.
-
-See the =parameters= property in these places
-
-- https://spec.openapis.org/oas/latest.html#operationObject
-- https://spec.openapis.org/oas/latest.html#path-item-object
-** Specification of OpenAPI references are inconsistent and nonsensical
-Most objects that can be referenced do so by having a union type on the schema.
-E.g., =Header Object | Reference Object= is either a header object or a
-reference object.
-
-But for https://spec.openapis.org/oas/latest.html#pathItemObject, this
-alternative is indicated by an optional field on the object `$ref`, and a
-warning that if this field is used along with the other fields, the meaning is
-undefined. That is, each path item object has a field `$ref` that can refers to
-a path item object (wtf?), and if it does and any other fields are used, you
-have undefined semantics in your spec. This could be avoided by using a union
-type here as they do everywhere else.
-
-Worse: in the https://spec.openapis.org/oas/latest.html#componentsObject, the
-=pathItems= which can hold the referents for a referenced path items object has
-the type =Path Item Object | Reference Object=, so the reference can go to
-another reference, or to a path item object which can itself have reference in a
-different way.
-
-** Treatment of fields is inconsistent
-E.g., the =description= field is, for no noted reason, required for =response
-objects=, while it is optional for (nearly?) every other object.
