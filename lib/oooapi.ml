@@ -11,57 +11,50 @@ module DataModule = struct
   exception Invalid_spec of string
   let raise_invalid msg = raise (Invalid_spec msg)
 
-  let to_multipart_fun_of_decl : type_declaration -> structure_item =
-    let form_part_of_label
-      : label_declaration -> expression =
-      fun {pld_name; pld_type; _} ->
-        let field_name = Ast.estring pld_name.txt in
-        (* Make the values uniformly optional *)
-        let opt_value = match pld_type with
-          | [%type: [%t? _] option] -> AstExt.Exp.field_access [%expr t] pld_name.txt
-          | _ -> [%expr Some [%e AstExt.Exp.field_access [%expr t] pld_name.txt]]
-        in
-        (* TODO: More general and nicer way to derive this  *)
-        (* The [v] is bound in the `Some` match case bellow *)
-        let field_value = match pld_type with
-        | [%type: int]
-        | [%type: int option] ->
-          [%expr `String (string_of_int v)]
-        | [%type: float]
-        | [%type: float option] ->
-          [%expr `String (string_of_float v)]
-        | [%type: bool]
-        | [%type: bool option] ->
-          [%expr `String (string_of_bool v)]
-        | [%type: string]
-        | [%type: string option] ->
-          [%expr `String v]
-        | [%type: [`String of string]]
-        | [%type: [`String of string] option] ->
-          [%expr `String (string_of_str v)]
-        | [%type: [`File of string ]]
-        | [%type: [`File of string ] option] ->
-          [%expr `File (string_of_file v)]
-        | [%type: Yojson.Safe.t]
-        | [%type: Yojson.Safe.t option] ->
-          [%expr `String (Yojson.Safe.to_string v)]
-        | typ ->
-          let msg =
-            Format.asprintf "unsupported type for field '%s' of multipart form: %a"
-              pld_name.txt
-              Astlib.Pprintast.core_type typ
-          in
-          raise (Unsupported (msg))
-        in
-        (* TODO: We should actually construct two different parts:
-           one for the optional one for required *)
-        (* Each field is treated as optional, if `None` will be filtered out *)
-        [%expr match [%e opt_value] with
-          | None -> None
-          | Some v -> Some ([%e field_name], [%e field_value])]
+  let form_part_of_label
+    : label_declaration -> expression =
+    fun {pld_name; pld_type; _} ->
+    let field_name = Ast.estring pld_name.txt in
+    (* Access the record field data: [t.field_name] *)
+    let field_access = AstExt.Exp.field_access [%expr t] pld_name.txt in
+    let field_principle_type : core_type = match pld_type with
+      | [%type: [%t? typ] option] -> typ
+      | typ -> typ
     in
-    fun decl ->
-      match decl.ptype_kind with
+    (* TODO: More general and nicer way to derive this  *)
+    (* The [v] is bound in the `Some` match case bellow *)
+    let field_value_conv = match field_principle_type with
+      | [%type: int] -> [%expr fun i -> `String (string_of_int i)]
+      | [%type: float] -> [%expr fun f -> `String (string_of_float f)]
+      | [%type: bool] -> [%expr fun b -> `String (string_of_bool b)]
+      | [%type: string] -> [%expr fun s -> `String s]
+      (* Fields that accept a [`String s] must be cast into the wider type *)
+      | [%type: [`String of string]] -> [%expr fun s -> (s :> Multipart.part_data)]
+      (* Fields that accept a [`File f] must be cast into the wider type *)
+      | [%type: [`File of string ]] -> [%expr fun f -> (f :> Multipart.part_data)]
+      | [%type: Yojson.Safe.t] -> [%expr fun j -> `String (Yojson.Safe.to_string j)]
+
+      | unsupported_type ->
+        let msg =
+          Format.asprintf "unsupported type for field '%s' of multipart form: %a"
+            pld_name.txt
+            Astlib.Pprintast.core_type unsupported_type
+        in
+        raise (Unsupported (msg))
+    in
+    (* Make the values uniformly optional *)
+    match pld_type with
+    | [%type: [%t? _] option]
+      (* E.g. [Option.map (fun v -> ("foo", field_value_conv v)) t.field_name] *)
+      -> [%expr Option.map (fun v -> ([%e field_name], [%e field_value_conv] v)) [%e field_access]]
+    | _
+      (* E.g. [Some ("foo", field_value_conv t.field_name)] *)
+      -> [%expr Some ([%e field_name], [%e field_value_conv] [%e field_access])]
+
+  (** Construct a function to convert a value of the type declaration to multipart form parts *)
+  let to_multipart_fun_of_decl
+    : type_declaration -> structure_item =
+    fun decl -> match decl.ptype_kind with
       | Ptype_record labels ->
         let body : expression =
           [%expr List.filter_map (fun x -> Fun.id x)
@@ -73,7 +66,9 @@ module DataModule = struct
             : t -> (string * [> `String of string | `File of string]) list
             = [%e fun_def]
         ]
-      | _ -> raise_invalid "multipart media type must be described by a record"
+      | _ ->
+        (** Why does OpenAPI allow this? *)
+        raise_invalid "multipart media type must be described by a record"
 
   let data_module_of_schema_entry : string * Http_spec.schema -> structure_item
       =
@@ -388,7 +383,7 @@ module EndpointsModule = struct
       let mod_impl =
         (* Instantiate the client and also provide if for direct reference *)
         let decls =
-          [ [%stri module Client = Oooapi_lib.Cohttp_client (Config)]
+          [ [%stri module Client = Cohttp_client (Config)]
           ; [%stri open Client]
           ]
         in
@@ -425,5 +420,6 @@ let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
   [%stri let __NOTE__ = [%e Ast.estring (notice ())]]
   :: [%stri let __TITLE__ = [%e Ast.estring spec.title]]
   :: [%stri let __API_VERSION__ = [%e Ast.estring spec.version]]
+  :: [%stri open Oooapi_lib]
   :: DataModule.of_schemata spec.schemata
   :: EndpointsModule.of_messages spec.messages spec.base_url

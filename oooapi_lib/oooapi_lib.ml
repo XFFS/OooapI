@@ -28,10 +28,13 @@ module Multipart : sig
     -> Multipart_form.part list
     -> Multipart_form.multipart
 
-  type part_data = string * [ `String of string | `File of string ]
-  (** The data needed to create a part of a multipart form *)
+  type part_data = [ `String of string | `File of string ]
+  (** The data payload of a multipart form part*)
 
-  val form_of_data : part_data list -> Multipart_form.multipart Lwt.t
+  type part = string * part_data
+  (** A part of a multipart form *)
+
+  val form_of_data : part list -> Multipart_form.multipart Lwt.t
 end = struct
   open Multipart_form
 
@@ -76,10 +79,13 @@ end = struct
     let rng ?g:_ _ = Uuidm.(v5 ns_X500 "boundary" |> to_string) in
     Multipart_form.multipart ~rng ?header ?boundary parts
 
-  type part_data = string * [ `String of string | `File of string ]
-  (** The data needed to create a part of a multipart form *)
+  type part_data = [ `String of string | `File of string ]
+  (** The data payload of a multipart form part*)
 
-  let form_of_data : part_data list -> Multipart_form.multipart Lwt.t =
+  type part = string * part_data
+  (** A part of a multipart form *)
+
+  let form_of_data : part list -> Multipart_form.multipart Lwt.t =
    fun part_data ->
     let open Lwt.Syntax in
     let+ parts =
@@ -100,8 +106,8 @@ end
 module Request = struct
   type data =
     [ `Json of Yojson.Safe.t
-    | `Multipart_form of Multipart.part_data list
-    | `Url_encoded_form of Multipart.part_data list
+    | `Multipart_form of Multipart.part list
+    | `Url_encoded_form of Multipart.part list
     ]
 end
 
@@ -142,7 +148,7 @@ module Cohttp_client : Client = functor (Config : Config) -> struct
     | Some token -> Cohttp.Header.add headers "Authorization" ("Bearer " ^ token)
 
   let url_form_data_of_multipart_data
-    : Multipart.part_data list -> (string * string list) list
+    : Multipart.part list -> (string * string list) list
     = fun parts ->
       parts |>
       List.map (function | (label, `String value) -> (label, [value])
