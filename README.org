@@ -14,15 +14,8 @@ OooapI currently supports:
 
 - Generating OCaml clients for a (a substantial) fragment of the OpenAPI
   specification schema.
-- A family of OCaml types encoding the supported OpenAPI fragment.
-
-It may be extended to support:
-
-- Generation of OpenAPI specs from values inhabiting the family of types.
-- Generation of a server's edge.
-- Generation of specific components: e.g., data serialization, or HTTP glue
-  code.
-- Generation for different stacks: e.g., Async, Httpaf, Eio
+- Generating a family of OCaml types encoding the supported OpenAPI fragment's
+  request and response data.
 
 * Approach
 
@@ -45,13 +38,30 @@ It may be extended to support:
 - Try to fail gracefully: JSON Schemas that are too complicated for us to
   support currently should degrade to untyped json.
 
+* Caveat
+
+This tool, and the associated library, are meant to assist OCaml programmers who
+need to interface with servers that sepcify their API via OpenAPI. However, if
+an alternative machine-readable specification is available, we would recommend
+considering it instead. Moreover, we would discourage server authors from using
+OpenAPI to specify their systems.
+
+We have come to the conclusion that OpenAPI and JSON Schema (upon which the
+former depends) are bad specification languages. Both languages adopt and
+propagate accidental complexity and inconsistent structure, and we believe that
+their widespread adoption in web development is a dangerous and costly
+proliferation of systemic technical debt.
+
+We have compiled [[./notes.org][some notes explaining the rationale for this assessment]].
+
+Please not this assessment is purely technical, and not a judgment about the
+intentions or abilities of those who have worked so hard on these efforts.
 * Alternatives
 
 - [[https://github.com/OpenAPITools/openapi-generator/][OpenAPI Generator]] includes a generator that is meant to produce OCaml client boilerplate.
 - [[https://github.com/andrenth/ocaml-swagger][OCaml-Swagger]] is a code generator that implements Swagger 2.0 API clients in OCaml.
 
 * Known Limitations
-
 ** JSON Schema:
 - Limited support for JSON Schema's =oneOf=, =anyOf=, =allOf=, and
   =not=. Only uniform simple types (string, numerics, monomorphic) arrays are
@@ -61,8 +71,9 @@ It may be extended to support:
 
 We did not find OCaml-Swagger until most initial work had been completed on this
 project. We were only looking for OpenAPI generation, and did not think to look
-for "swagger". That said, this library supports generation from the more recent
-OpenAPI version 3.
+for "swagger". That said, OCaml-Swagger only supports (part of) Swagger 2.0,
+which was released in 2014. OooapI supports (part of) OpenAPI version 3,
+released in 2017.
 
 At the time work on this library was initiated, the OCaml client generation
 supplied by OpenAPI Generator had the following documented errors:
@@ -73,11 +84,17 @@ supplied by OpenAPI Generator had the following documented errors:
 - https://github.com/OpenAPITools/openapi-generator/issues/8397
 - https://github.com/OpenAPITools/openapi-generator/issues/16890
 
-To see the current known errors, see https://github.com/OpenAPITools/openapi-generator/issues?q=is%3Aissue+is%3Aopen+ocaml
+To see the current known errors with OCaml generation, see https://github.com/OpenAPITools/openapi-generator/issues?q=is%3Aissue+is%3Aopen+ocaml
 
-In our usage, we encountered additional errors around edge cases resulting in
-generation of syntactically invalid OCaml programs. We ended up generating
-(a nontrivial amount of) broken code that required significant manual fixes.
+However, the tool has broader stability and correctness issues.  For a lengthy
+discussion of the tools copious shortcomings and rough spots, see  [[https://github.com/OpenAPITools/openapi-generator/issues/7490][Do people
+successfully use this? #7490]]?
+
+Our own attempt to use the tool reflected the struggles discussed in issue
+#7490, and we encountered numerous generation errors resulting in generation of
+syntactically invalid OCaml programs. We ended up generating (a nontrivial
+amount of) broken code that required significant manual fixes, and the quality
+and quantity of which was not up to our standards.
 
 We explored contributing fixes to the generator, but after investigating the
 implementation, we came to the conclusion that the approach to generation via
@@ -86,6 +103,10 @@ implementation, we came to the conclusion that the approach to generation via
 We hope that approaching this problem through a principled metaprogramming
 approach, leveraging OCaml's ppx system and supporting libraries, will enable a
 more modular and a more correct implementation.
+
+All that said, we have come to the conclusion that the main problems troubling
+OpenAPI-Generator are probably just inheritence from the copious accidental
+complexity permeating JSON Schema and OpenaAPI
 
 * Footnotes
 
