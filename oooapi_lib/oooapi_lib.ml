@@ -97,31 +97,35 @@ end = struct
     form parts
 end
 
-module type Client = functor (_ : Config) -> sig
+module Request = struct
   type data =
     [ `Json of Yojson.Safe.t
     | `Multipart_form of Multipart.part_data list
     | `Url_encoded_form of Multipart.part_data list
     ]
+end
 
-  type request_err =
+module Response = struct
+  type error =
     [ `Request of Cohttp.Code.status_code * string
     | `Deseriaization of string * string
     ]
 
-  type 'a request_result = ('a, request_err) result Lwt.t
+  type 'a t = ('a, error) result Lwt.t
+end
 
+module type Client = functor (_ : Config) -> sig
   val of_json_string : (Yojson.Safe.t -> 'a) -> string -> 'a
 
-  val make_request :
-       ?data:data
+  val make_request
+     : ?data:Request.data
     -> base_url:string
     -> path:string list
     -> params:(string * string) list
     -> headers:(string * string) list
     -> decode:(string -> ('resp, string) result)
     -> Cohttp.Code.meth
-    -> 'resp request_result
+    -> 'resp Response.t
 end
 
 module Cohttp_client : Client = functor (Config : Config) -> struct
@@ -137,19 +141,6 @@ module Cohttp_client : Client = functor (Config : Config) -> struct
     | None -> headers
     | Some token -> Cohttp.Header.add headers "Authorization" ("Bearer " ^ token)
 
-  type request_err =
-    [ `Request of Cohttp.Code.status_code * string
-    | `Deseriaization of string * string
-    ]
-
-  type 'a request_result = ('a, request_err) result Lwt.t
-
-  type data =
-    [ `Json of Yojson.Safe.t
-    | `Multipart_form of Multipart.part_data list
-    | `Url_encoded_form of Multipart.part_data list
-    ]
-
   let url_form_data_of_multipart_data
     : Multipart.part_data list -> (string * string list) list
     = fun parts ->
@@ -160,13 +151,13 @@ module Cohttp_client : Client = functor (Config : Config) -> struct
   let of_json_string f s = f (Yojson.Safe.from_string s)
 
   let make_request
-      ?(data : data option)
+      ?(data : Request.data option)
       ~(base_url : string)
       ~(path : string list)
       ~(params : (string * string) list)
       ~(headers : (string * string) list)
       ~(decode : string -> ('resp, string) result)
-      (meth : Cohttp.Code.meth) : 'resp request_result =
+      (meth : Cohttp.Code.meth) : 'resp Response.t =
     let open Lwt.Syntax in
     let uri =
       let path_parts = base_url :: path in
