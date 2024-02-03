@@ -1,60 +1,94 @@
 open Ppxlib
 open AstUtil
-
-(* re-exported just for testing *)
-module DAG = DAG
 module H = Http_spec
 
-module DataModule = struct
+(* re-exported just for testing *)
+module Internal__ = struct
+  module DAG = DAG
+end
+
+(* Exceptions ans helpers to raise them *)
+module Exn = struct
+  exception Invalid_spec of string
+  let invalid msg = raise (Invalid_spec msg)
 
   exception Unsupported of string
-  exception Invalid_spec of string
-  let raise_invalid msg = raise (Invalid_spec msg)
+  let unsupported msg = raise (Unsupported msg)
+end
 
+
+(** Code to construct the [Data] module, which includes type declarations to
+    represent all the request and response data, along with serialization
+    functions and helpers to construct instances of the data.
+
+    The [Data] module is a module of modules, and looks roughly like:
+
+    {|
+    module Data = struct
+      module SomeData = struct
+        type some_type = ...
+          [@@deriving make, yojson]
+        ...
+        type t = {foo: some_type; ... }
+          [@@deriving make, yojson]
+      end
+
+      ...
+    end
+    |}
+
+*)
+module DataModule = struct
+
+  (** Generate a form part for a record field *)
   let form_part_of_label
-    : label_declaration -> expression =
-    fun {pld_name; pld_type; _} ->
-    let field_name = Ast.estring pld_name.txt in
-    (* Access the record field data: [t.field_name] *)
-    let field_access = AstExt.Exp.field_access [%expr t] pld_name.txt in
-    let field_principle_type : core_type = match pld_type with
-      | [%type: [%t? typ] option] -> typ
-      | typ -> typ
-    in
-    (* TODO: More general and nicer way to derive this  *)
-    (* The [v] is bound in the `Some` match case bellow *)
-    let field_value_conv = match field_principle_type with
-      | [%type: int] -> [%expr fun i -> `String (string_of_int i)]
-      | [%type: float] -> [%expr fun f -> `String (string_of_float f)]
-      | [%type: bool] -> [%expr fun b -> `String (string_of_bool b)]
-      | [%type: string] -> [%expr fun s -> `String s]
-      (* Fields that accept a [`String s] must be cast into the wider type *)
-      | [%type: [`String of string]] -> [%expr fun s -> (s :> Multipart.part_data)]
-      (* Fields that accept a [`File f] must be cast into the wider type *)
-      | [%type: [`File of string ]] -> [%expr fun f -> (f :> Multipart.part_data)]
-      | [%type: Yojson.Safe.t] -> [%expr fun j -> `String (Yojson.Safe.to_string j)]
+    : label_declaration -> expression
+    = fun {pld_name; pld_type; _} ->
+      let field_name: expression = Ast.estring pld_name.txt
+      in
+      (* Access the record field data: [t.field_name] *)
+      let field_value: expression = AstExt.Exp.field_access [%expr t] pld_name.txt
+      in
+      (* Access the record field data: [t.field_name] *)
+      let (field_principle_type, is_optional) : core_type * bool =
+        match pld_type with
+        | [%type: [%t? typ] option] -> typ, true
+        | typ                       -> typ, false
+      in
+      (* A conversion function of type [field_principle_type -> Multipart.part_data] *)
+      let field_value_conv: expression =
+        match field_principle_type with
+        | [%type: bool]          -> [%expr fun b -> `String (string_of_bool b)]
+        | [%type: int]           -> [%expr fun i -> `String (string_of_int i)]
+        | [%type: float]         -> [%expr fun f -> `String (string_of_float f)]
+        | [%type: string]        -> [%expr fun s -> `String s]
+        | [%type: Yojson.Safe.t] -> [%expr fun j -> `String (Yojson.Safe.to_string j)]
 
-      | unsupported_type ->
-        let msg =
-          Format.asprintf "unsupported type for field '%s' of multipart form: %a"
-            pld_name.txt
-            Astlib.Pprintast.core_type unsupported_type
-        in
-        raise (Unsupported (msg))
-    in
-    (* Make the values uniformly optional *)
-    match pld_type with
-    | [%type: [%t? _] option]
-      (* E.g. [Option.map (fun v -> ("foo", field_value_conv v)) t.field_name] *)
-      -> [%expr Option.map (fun v -> ([%e field_name], [%e field_value_conv] v)) [%e field_access]]
-    | _
-      (* E.g. [Some ("foo", field_value_conv t.field_name)] *)
-      -> [%expr Some ([%e field_name], [%e field_value_conv] [%e field_access])]
+        (* We cast from the narrower [[`String]] or [[`File]] into the wider [Multipart.part_data] *)
+        | [%type: [`String of string]] -> [%expr fun s -> (s :> Multipart.part_data)]
+        | [%type: [`File of string ]]  -> [%expr fun f -> (f :> Multipart.part_data)]
 
-  (** Construct a function to convert a value of the type declaration to multipart form parts *)
+        (* TODO: Add support for, e.g., "deepObjects": https://github.com/OAI/OpenAPI-Specification/issues/1706*)
+        | unsupported_type ->
+          let msg =
+            Format.asprintf "unsupported type for field '%s' of multipart form: %a"
+              pld_name.txt
+              Astlib.Pprintast.core_type unsupported_type
+          in
+          Exn.unsupported msg
+      in
+      if is_optional then
+        (* E.g. [Option.map (fun v -> ("foo", field_value_conv v)) t.field_name] *)
+        [%expr Option.map (fun v -> ([%e field_name], [%e field_value_conv] v)) [%e field_value]]
+      else
+        (* E.g. [Some ("foo", field_value_conv t.field_name)] *)
+        [%expr Some ([%e field_name], [%e field_value_conv] [%e field_value])]
+
+  (** Construct a function to convert a value of the declared type into the
+      parts for a multipart form *)
   let to_multipart_fun_of_decl
-    : type_declaration -> structure_item =
-    fun decl -> match decl.ptype_kind with
+    : type_declaration -> structure_item
+    = fun decl -> match decl.ptype_kind with
       | Ptype_record labels ->
         let body : expression =
           [%expr List.filter_map (fun x -> Fun.id x)
@@ -67,61 +101,65 @@ module DataModule = struct
             = [%e fun_def]
         ]
       | _ ->
-        (** Why does OpenAPI allow this? *)
-        raise_invalid "multipart media type must be described by a record"
+        (* Why does OpenAPI allow this? *)
+        Exn.invalid "multipart media type must be described by a record"
 
-  let data_module_of_schema_entry : string * Http_spec.schema -> structure_item
-      =
-   fun (name, schema) ->
-    let name_str = Camelsnakekebab.upper_camel_case name in
-    let name = n (Some name_str) in
-    let main_decl, declarations = Ocaml_of_json_schema.type_declarations schema.schema.schema in
-    let type_declarations =
-      let dependency_ordered_declarations = declarations @ [main_decl] in
-      List.map (fun decl -> Ast.pstr_type Recursive [decl]) dependency_ordered_declarations
-    in
-    let to_multipart = match schema.kind with
-      | `Url_encoded_form (* The to_multipart function also works for URL encoded data to hand to oooapi_lib *)
-      | `Multipart_form ->
-        let f_exp =
-          try to_multipart_fun_of_decl main_decl
-          with Unsupported err ->
-            raise (Unsupported (name_str ^ ": " ^ err))
-        in
-        [f_exp]
-      | _ -> []
-    in
-    let expr = Ast.pmod_structure (type_declarations @ to_multipart) in
-    Ast.module_binding ~name ~expr |> Ast.pstr_module
+  (** Construct the contents of the [Data] module that contains all the data type modules *)
+  let data_module_of_schema_entry
+    : string * Http_spec.schema -> structure_item
+    = fun (name, schema) ->
+      let name_str = Camelsnakekebab.upper_camel_case name in
+      let name = n (Some name_str) in
+      let main_decl, declarations = Ocaml_of_json_schema.type_declarations schema.schema.schema in
+      let type_declarations =
+        let dependency_ordered_declarations = declarations @ [main_decl] in
+        List.map (fun decl -> Ast.pstr_type Recursive [decl]) dependency_ordered_declarations
+      in
+      let to_multipart : structure_item list = match schema.kind with
+        | `Url_encoded_form (* The to_multipart function also works for URL encoded data to hand to oooapi_lib *)
+        | `Multipart_form ->
+          let f_exp =
+            try to_multipart_fun_of_decl main_decl
+            with Exn.Unsupported err ->
+              Exn.unsupported (err ^ " while converting" ^ name_str)
+          in
+          [f_exp]
+        | _ -> [] (* We don't need this conversion function for other media *)
+      in
+      let expr = Ast.pmod_structure (type_declarations @ to_multipart) in
+      Ast.module_binding ~name ~expr |> Ast.pstr_module
 
   (* We only need the last part of the path, which is the key in the OpenAPI schema object *)
-  let rec json_query_path_terminal : Json_query.path -> string = function
-    | [] -> failwith "Invalid ref path: does not end with field"
-    | [ `Field f ] -> f
-    | _ :: rest -> json_query_path_terminal rest
+  let rec json_query_path_terminal
+    : Json_query.path -> string
+    = function
+      | [] -> Exn.invalid "Invalid reference path: it does not end with field."
+      | [ `Field f ] -> f
+      | _ :: rest -> json_query_path_terminal rest
 
-  let schema_deps : Json_schema.schema -> string list =
-   fun schema ->
-    let rec gather_deps (el : Json_schema.element) =
+  (* The names of the dependencies of a JSON Schema element *)
+  let rec element_deps
+    : Json_schema.element -> string list
+    = fun el ->
       match el.kind with
-      | Def_ref path -> [ json_query_path_terminal path ]
-      | Monomorphic_array (e, _) -> gather_deps e
+      | Def_ref path ->
+        [ json_query_path_terminal path ]
+      | Monomorphic_array (e, _) ->
+        element_deps e
       | Object o ->
-          o.properties
-          |> List.fold_left (fun acc (_, e, _, _) -> acc @ gather_deps e) []
-      | Array (es, _) | Combine (_, es) ->
-          List.fold_left (fun acc e -> acc @ gather_deps e) [] es
-      (* TODO These should be accounted for at some point *)
-      | Id_ref _ | Ext_ref _ | String _ | Integer _ | Number _ | Boolean | Null
-      | Any | Dummy ->
-          []
-    in
-    Json_schema.root schema |> gather_deps
-
-  (* The DAG is used for dependency analysis *)
-  module Graph = DAG.Make (String)
+        o.properties |> List.fold_left (fun acc (_, e, _, _) -> acc @ element_deps e) []
+      | Array (es, _)
+      | Combine (_, es) ->
+        List.fold_left (fun acc e -> acc @ element_deps e) [] es
+      (* TODO Should these refs be accounted for at some point? *)
+      | Id_ref _ | Ext_ref _
+      (*  *)
+      | String _ | Integer _ | Number _ | Boolean | Null | Any | Dummy ->
+        []
 
   let of_schemata (schemata : Http_spec.schemata) =
+    (* The DAG is used for dependency analysis *)
+    let module Graph = DAG.Make (String) in
     let name = Ast.Located.mk (Some "Data") in
     let expr =
       let schemata = Http_spec.SM.bindings schemata in
@@ -133,7 +171,7 @@ module DataModule = struct
             |> ListLabels.fold_left ~init:Graph.empty
                  ~f:(fun graph (src, (s : Http_spec.schema)) ->
                    (* Add each schema and its deps to the graph *)
-                   let deps = schema_deps s.schema.schema in
+                   let deps = s.schema.schema |> Json_schema.root |> element_deps  in
                    Graph.add_arcs ~src deps graph)
           in
           let sorted_rev = Graph.topological_sort dep_graph in
@@ -147,16 +185,12 @@ module DataModule = struct
                    failwith
                      ("TODO: No schema provided matching reference " ^ label))
       in
-      let file_type_decls =
-        [ [%stri let string_of_file (`File n) = n]
-        ; [%stri let string_of_str (`String n) = n]
-        ]
-      in
-      Ast.pmod_structure (file_type_decls @ structure_items)
+      Ast.pmod_structure (structure_items)
     in
     Ast.module_binding ~name ~expr |> Ast.pstr_module
 end
 
+(** *)
 module EndpointsModule = struct
   exception Invalid_data of string
 

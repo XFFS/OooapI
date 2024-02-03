@@ -2,10 +2,12 @@ open Tezt
 open Tezt.Base
 open Lib
 
+module DAG = Oooapi.Internal__.DAG
+
 let test ?(tags = [ "dag" ]) title f = Test.register ~__FILE__ ~title ~tags f;;
 
 test "add_arcs ~src [] ensures src is added to graph" @@ fun () ->
-let module G = Oooapi.DAG.Make (Int) in
+let module G = DAG.Make (Int) in
 let nodes =
   G.empty |> G.add_arcs ~src:0 [] |> G.nodes |> G.Nodes.to_seq |> List.of_seq
 in
@@ -17,7 +19,7 @@ unit
 ;;
 
 test "can topo sort dag" @@ fun () ->
-let module G = Oooapi.DAG.Make (Int) in
+let module G = DAG.Make (Int) in
 (*
 0 -> 1 -> 2 -> 3
           ^

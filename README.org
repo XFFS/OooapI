@@ -1,6 +1,6 @@
 #+title: OooapI: OCaml of OpenAPI
 
-*tl;dr*: OooapI implements a solution to this problem:
+*tl;dr*: OooapI aims to implement a solution to this problem:
 
 #+begin_src
 spec:'OpenAPI spec' -> 'client library for'(spec):OCaml
