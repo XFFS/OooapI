@@ -168,7 +168,6 @@ module DataModule = struct
       | String _ | Integer _ | Number _ | Boolean | Null | Any | Dummy ->
         []
 
-  (* TODO: Find non-terminatoin here on the Stripe spec *)
   let of_schemata (schemata : Http_spec.schemata) =
     let schemata = Http_spec.SM.bindings schemata in
     (* The DAG is used for dependency analysis *)
@@ -195,7 +194,7 @@ module DataModule = struct
       with
       | Graph.Cycle_found cycle ->
         let msg = Format.asprintf
-            "Cycle found in data dependencies found between schema components: %a"
+            "Cyclical data dependencies found between schema components: %a"
             (Graph.pp_trail Format.pp_print_string)
             cycle
         in
@@ -250,57 +249,58 @@ module ApiMakeFunctor = struct
     let to_list { query; path; header; cookie } = query @ path @ header @ cookie
 
     (* TODO: We need to gather objects, records decls, from parameters *)
-    let of_http_spec_param : string * H.Message.Params.param -> param =
-     fun (name, p) ->
-      let var = Ast.evar name in
-      let pat = Ast.pvar name in
-      let optional = not p.required in
-      let default, to_string =
-        let schema = p.schema.schema.schema in
-        let elem = Json_schema.root schema in
-        let to_string, typ =
-          let t = Ocaml_of_json_schema.type_of_element ~qualifier:"not_applicable____" elem |> fst in
-          match t with
-          (* TODO: Add support for all types *)
-          | [%type: string]      -> ([%expr fun x -> x], t)
-          | [%type: string list] -> ([%expr fun x -> String.concat "," x], t)
-          | [%type: bool]        -> ([%expr string_of_bool], t)
-          | [%type: int]         -> ([%expr string_of_int], t)
-          | [%type: float]       -> ([%expr string_of_float], t)
-          | unsupported_typ      ->
-            (Printf.eprintf
-               "ERROR: parameters of type %s not supported for parameter %s, using JSON as fallback. This is probably invalid\n"
-               (string_of_core_type unsupported_typ)
-               name);
-            ([%expr Yojson.Safe.to_string], [%type: Yojson.Safe.t])
+    let of_http_spec_param
+      : string * H.Message.Params.param -> param
+      = fun (name, p) ->
+        let var = Ast.evar name in
+        let pat = Ast.pvar name in
+        let optional = not p.required in
+        let default, to_string =
+          let schema = p.schema.schema.schema in
+          let elem = Json_schema.root schema in
+          let to_string, typ =
+            let t = Ocaml_of_json_schema.type_of_element ~qualifier:"not_applicable____" elem |> fst in
+            match t with
+            | [%type: string]      -> ([%expr fun x -> x], t)
+            | [%type: string list] -> ([%expr fun x -> String.concat "," x], t)
+            | [%type: bool]        -> ([%expr string_of_bool], t)
+            | [%type: int]         -> ([%expr string_of_int], t)
+            | [%type: float]       -> ([%expr string_of_float], t)
+            (* TODO: Add support for complex types *)
+            | unsupported_typ      ->
+              (Printf.eprintf
+                 "ERROR: parameters of type %s not supported for parameter %s, using JSON as fallback. This is probably invalid\n"
+                 (string_of_core_type unsupported_typ)
+                 name);
+              ([%expr Yojson.Safe.to_string], [%type: Yojson.Safe.t])
+          in
+          let default =
+            (* TODO: Default serialization should be based on the param's type *)
+            elem.default
+            |> Option.map (Json_repr.any_to_repr (module Json_repr.Yojson))
+            |> Option.map (function
+                | `String s -> Ast.estring s
+                | `Bool b -> Ast.ebool b
+                | `Int i -> (
+                    (* JS doesn't distinguish between `Number` "types", so we have be sure we
+                       decode the default correctly in case it is given in an integral form when
+                       it should be a float. *)
+                    match typ with
+                    | [%type: float] ->
+                      Ast.efloat (string_of_float (float_of_int i))
+                    | _ -> Ast.eint i)
+                | `Float f -> Ast.efloat (string_of_float f)
+                | unsupported_default ->
+                  Exn.unsupported
+                    (Printf.sprintf
+                       "default parmamters value %s not supported for param %s"
+                       (Yojson.Safe.to_string unsupported_default)
+                       name))
+          in
+          (default, to_string)
         in
-        let default =
-          (* TODO: Default serialization should be based on the param's type *)
-          elem.default
-          |> Option.map (Json_repr.any_to_repr (module Json_repr.Yojson))
-          |> Option.map (function
-               | `String s -> Ast.estring s
-               | `Bool b -> Ast.ebool b
-               | `Int i -> (
-                   (* JS doesn't distinguish between `Number` "types", so we have be sure we
-                      decode the default correctly in case it is given in an integral form when
-                      it should be a float. *)
-                   match typ with
-                   | [%type: float] ->
-                       Ast.efloat (string_of_float (float_of_int i))
-                   | _ -> Ast.eint i)
-               | `Float f -> Ast.efloat (string_of_float f)
-               | unsupported_default ->
-                   Exn.unsupported
-                     (Printf.sprintf
-                        "default parmamters value %s not supported for param %s"
-                        (Yojson.Safe.to_string unsupported_default)
-                        name))
-        in
-        (default, to_string)
-      in
-      let default = if not optional then None else default in
-      { name; optional; default; to_string; var; pat; format = None }
+        let default = if not optional then None else default in
+        { name; optional; default; to_string; var; pat; format = None }
 
     let of_openapi_parameters
       : Http_spec.Message.Params.t -> t
@@ -338,15 +338,15 @@ module ApiMakeFunctor = struct
       (* https://spec.openapis.org/oas/v3.1.0#responses-object *)
       Exn.invalid_data "Invalid schema: no 200 response"
     | Some schema ->
-    match schema.kind with
-    | `Html | `Binary | `Pdf | `Url_encoded_form | `Multipart_form ->
-      [%expr fun x -> Ok x]
-    | `Json ->
-      let mod_name = Camelsnakekebab.upper_camel_case schema.name in
-      let conv_fun =
-        Ast.evar (data_module_fun_name mod_name "of_yojson")
-      in
-      [%expr of_json_string [%e conv_fun]]
+      match schema.kind with
+      | `Html | `Binary | `Pdf | `Url_encoded_form | `Multipart_form ->
+        [%expr fun x -> Ok x]
+      | `Json ->
+        let mod_name = Camelsnakekebab.upper_camel_case schema.name in
+        let conv_fun =
+          Ast.evar (data_module_fun_name mod_name "of_yojson")
+        in
+        [%expr of_json_string [%e conv_fun]]
 
   let path_parts path : expression =
     path
