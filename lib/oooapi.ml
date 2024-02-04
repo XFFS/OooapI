@@ -14,6 +14,9 @@ module Exn = struct
 
   exception Unsupported of string
   let unsupported msg = raise (Unsupported msg)
+
+  exception Invalid_data of string
+  let invalid_data msg = raise (Invalid_data msg)
 end
 
 let get_or
@@ -134,12 +137,16 @@ module DataModule = struct
       Ast.module_binding ~name ~expr |> Ast.pstr_module
 
   (* We only need the last part of the path, which is the key in the OpenAPI schema object *)
-  let rec json_query_path_terminal
+  let json_query_path_terminal
     : Json_query.path -> string
-    = function
-      | [] -> Exn.invalid "Invalid reference path: it does not end with field."
-      | [ `Field f ] -> f
-      | _ :: rest -> json_query_path_terminal rest
+    = fun path ->
+      path
+      |> ListLabels.fold_left
+        ~init:None
+        ~f:(fun _ x -> match x with `Field f -> Some f | _ -> None)
+      |> function
+      | Some f -> f
+      | None  -> Exn.invalid "Invalid reference path: it does not end with field."
 
   (* The names of the dependencies of a JSON Schema element *)
   let rec element_deps
@@ -207,16 +214,18 @@ end
     end
     |} *)
 module ApiMakeFunctor = struct
-  exception Invalid_data of string
 
+  (* OpenAPI "params", which can be in lots of different places
+
+     I do not know why these are all treated the same way in the OpenAPI schema. *)
   module Params = struct
     type param = {
-      name : string;
-      var : expression;
-      pat : pattern;
-      to_string : expression;
-      optional : bool;
-      default : expression option;
+      name : string; (** The name of the params key *)
+      var : expression; (** The variable used to refer to the parameter in expressions *)
+      pat : pattern; (** The pattern for binding the parameter's value in function heads *)
+      to_string : expression; (** A function to convert the parameter data to a string for serialization *)
+      optional : bool; (** True iff the parameter is not required *)
+      default : expression option; (** [Some v] if the parameter has a default value [v] *)
       format : string option (* E.g., "binary" *);
     }
 
@@ -231,7 +240,6 @@ module ApiMakeFunctor = struct
     let to_list { query; path; header; cookie } = query @ path @ header @ cookie
 
     (* TODO: We need to gather objects, records decls, from parameters *)
-    (* TODO: Needs cleanup *)
     let of_http_spec_param : string * H.Message.Params.param -> param =
      fun (name, p) ->
       let var = Ast.evar name in
@@ -314,9 +322,9 @@ module ApiMakeFunctor = struct
   let response_decoder (responses : H.Message.Responses.t) : expression =
     match responses |> List.assoc_opt `OK with
     | None ->
-        (* TODO 200 is required only when it is the ONLY response. So need to account for others *)
-        (* https://spec.openapis.org/oas/v3.1.0#responses-object *)
-        raise (Invalid_data "Invalid schema: no 200 response")
+      (* TODO 200 is required only when it is the ONLY response. So need to account for others *)
+      (* https://spec.openapis.org/oas/v3.1.0#responses-object *)
+      Exn.invalid_data "Invalid schema: no 200 response"
     | Some schema ->
     match schema.kind with
     | `Html | `Binary | `Pdf | `Url_encoded_form | `Multipart_form ->
@@ -333,31 +341,31 @@ module ApiMakeFunctor = struct
     |> List.map (function `C c -> Ast.estring c | `P p -> Ast.evar p)
     |> Ast.elist
 
+  let query_param
+    : Params.param -> expression
+    = fun { name; to_string; var; optional; default; _ } ->
+      match optional, default with
+      | true, None ->
+        (* The parameter is optional, defaulting to None *)
+        [%expr Option.map (fun p -> [%e Ast.estring name], ([%e to_string] p)) [%e var]]
+      | _ ->
+        (* We are assured to have a value, either via a default or because it is required *)
+        [%expr Some ([%e Ast.estring name], [%e to_string] [%e var])]
+
   let query_params
     : Params.param list -> expression
-    =
-    let param_entry_expression
-      : Params.param -> expression
-      = fun { name; to_string; var; optional; default; _ } ->
-        match optional, default with
-        | true, None ->
-          (* The parameter is optional, defaulting to None *)
-          [%expr Option.map (fun p -> [%e Ast.estring name], ([%e to_string] p)) [%e var]]
-        | _ ->
-          (* We are assured to have a value. via default or required *)
-          [%expr Some ([%e Ast.estring name], [%e to_string] [%e var])]
-    in
-    fun params ->
-      let params_option_list = params |> List.map param_entry_expression |> Ast.elist
+    = fun params ->
+      let params_option_list = params |> List.map query_param |> Ast.elist
       (* We filter out just the param entries that are actually supplied *)
       in [%expr List.filter_map Fun.id [%e params_option_list]]
 
-
-  let extra_headers (params : Params.param list) : expression =
-    params
-    |> List.map (fun (p : Params.param) ->
-        [%expr [%e Ast.estring p.name], [%e p.to_string] [%e p.var]])
-    |> Ast.elist
+  let extra_headers
+    : Params.param list -> expression
+    = fun params ->
+      params
+      |> List.map (fun (p : Params.param) ->
+          [%expr [%e Ast.estring p.name], [%e p.to_string] [%e p.var]])
+      |> Ast.elist
 
   let fun_with_params ~data (params : Params.t) body =
     let module Exp = AstExt.Exp in
