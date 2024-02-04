@@ -16,6 +16,12 @@ module Exn = struct
   let unsupported msg = raise (Unsupported msg)
 end
 
+let get_or
+  : 'a option -> f:(unit -> 'a) -> 'a
+  = fun o ~f ->
+    match o with
+    | None   -> f ()
+    | Some v -> v
 
 (** Code to construct the [Data] module, which includes type declarations to
     represent all the request and response data, along with serialization
@@ -35,9 +41,7 @@ end
 
       ...
     end
-    |}
-
-*)
+    |} *)
 module DataModule = struct
 
   (** Generate a form part for a record field *)
@@ -91,7 +95,7 @@ module DataModule = struct
     = fun decl -> match decl.ptype_kind with
       | Ptype_record labels ->
         let body : expression =
-          [%expr List.filter_map (fun x -> Fun.id x)
+          [%expr List.filter_map (fun x -> x)
               [%e labels |> List.map form_part_of_label |> Ast.elist]]
         in
         let fun_def: expression = AstExt.Exp.f [%pat? t] body in
@@ -106,8 +110,8 @@ module DataModule = struct
 
   (** Construct the contents of the [Data] module that contains all the data type modules *)
   let data_module_of_schema_entry
-    : string * Http_spec.schema -> structure_item
-    = fun (name, schema) ->
+    : string -> Http_spec.schema -> structure_item
+    = fun name schema ->
       let name_str = Camelsnakekebab.upper_camel_case name in
       let name = n (Some name_str) in
       let main_decl, declarations = Ocaml_of_json_schema.type_declarations schema.schema.schema in
@@ -158,40 +162,51 @@ module DataModule = struct
         []
 
   let of_schemata (schemata : Http_spec.schemata) =
+    let schemata = Http_spec.SM.bindings schemata in
     (* The DAG is used for dependency analysis *)
     let module Graph = DAG.Make (String) in
-    let name = Ast.Located.mk (Some "Data") in
-    let expr =
-      let schemata = Http_spec.SM.bindings schemata in
-      let structure_items =
-        let dep_ordering =
-          let dep_graph =
-            (* Build a dependency graph of each component *)
-            schemata
-            |> ListLabels.fold_left ~init:Graph.empty
-                 ~f:(fun graph (src, (s : Http_spec.schema)) ->
-                   (* Add each schema and its deps to the graph *)
-                   let deps = s.schema.schema |> Json_schema.root |> element_deps  in
-                   Graph.add_arcs ~src deps graph)
-          in
-          let sorted_rev = Graph.topological_sort dep_graph in
-          List.rev sorted_rev
-        in
-        dep_ordering
-        |> List.map (fun label ->
-               match List.assoc_opt label schemata with
-               | Some s -> data_module_of_schema_entry (label, s)
-               | None ->
-                   failwith
-                     ("TODO: No schema provided matching reference " ^ label))
-      in
-      Ast.pmod_structure (structure_items)
+    let add_dependency graph (src, (s : Http_spec.schema)) =
+      (* Add each schema and its deps to the graph *)
+      let deps = s.schema.schema |> Json_schema.root |> element_deps  in
+      Graph.add_arcs ~src deps graph
     in
+    let generate_data_module schema_label =
+      schemata
+      |> List.assoc_opt schema_label
+      |> get_or ~f:(fun () -> Exn.invalid ("No schema found matching reference " ^ schema_label))
+      |> data_module_of_schema_entry schema_label
+    in
+    let expr =
+      schemata
+      |> ListLabels.fold_left ~init:Graph.empty ~f:add_dependency (* Build the dependency graph *)
+      |> Graph.topological_sort
+      |> List.rev (* We need to generate the modules with the least dependent first *)
+      |> List.map generate_data_module
+      |> Ast.pmod_structure
+    in
+    let name = Ast.Located.mk (Some "Data") in
     Ast.module_binding ~name ~expr |> Ast.pstr_module
 end
 
-(** *)
-module EndpointsModule = struct
+(** Code to construct the [Make] functor, which takes an HTTP client module,
+    and a configuration module and constructs a module with functions for
+    each operation specified by the OpenAPI spec.
+
+    It looks roughly like this:
+
+    {|
+    module Make (Client: Oooapy_lib.Client) (Config: Oooapy_lib.Config) = struct
+      module Client = Client (Config)
+      open Client
+
+      let base_url = "https://foo/bar/baz"
+
+      let operation_foo = ...
+      let operation_bar = ...
+      ...
+    end
+    |} *)
+module ApiMakeFunctor = struct
   exception Invalid_data of string
 
   module Params = struct
@@ -229,12 +244,12 @@ module EndpointsModule = struct
           let t = Ocaml_of_json_schema.type_of_element ~qualifier:"not_applicable____" elem |> fst in
           match t with
           (* TODO: Add support for all types *)
-          | [%type: string] -> ([%expr fun x -> x], t)
+          | [%type: string]      -> ([%expr fun x -> x], t)
           | [%type: string list] -> ([%expr fun x -> String.concat "," x], t)
-          | [%type: bool] -> ([%expr string_of_bool], t)
-          | [%type: int] -> ([%expr string_of_int], t)
-          | [%type: float] -> ([%expr string_of_float], t)
-          | unsupported_typ ->
+          | [%type: bool]        -> ([%expr string_of_bool], t)
+          | [%type: int]         -> ([%expr string_of_int], t)
+          | [%type: float]       -> ([%expr string_of_float], t)
+          | unsupported_typ      ->
             (Printf.eprintf
                "ERROR: parameters of type %s not supported for parameter %s, using JSON as fallback. This is probably invalid\n"
                (string_of_core_type unsupported_typ)
@@ -257,7 +272,7 @@ module EndpointsModule = struct
                    | _ -> Ast.eint i)
                | `Float f -> Ast.efloat (string_of_float f)
                | unsupported_default ->
-                   failwith
+                   Exn.unsupported
                      (Printf.sprintf
                         "default parmamters value %s not supported for param %s"
                         (Yojson.Safe.to_string unsupported_default)
@@ -302,20 +317,16 @@ module EndpointsModule = struct
         (* TODO 200 is required only when it is the ONLY response. So need to account for others *)
         (* https://spec.openapis.org/oas/v3.1.0#responses-object *)
         raise (Invalid_data "Invalid schema: no 200 response")
-    | Some schema -> (
-        match schema.kind with
-        | `Json ->
-            let mod_name = Camelsnakekebab.upper_camel_case schema.name in
-            let conv_fun =
-              Ast.evar (data_module_fun_name mod_name "of_yojson")
-            in
-            [%expr of_json_string [%e conv_fun]]
-        | `Html -> [%expr fun x -> Ok x]
-        | `Binary -> [%expr fun x -> Ok x]
-        | `Pdf -> [%expr fun x -> Ok x]
-        (* TODO Add support for decoding form responses *)
-        | `Url_encoded_form -> [%expr fun x -> Ok x]
-        | `Multipart_form -> [%expr fun x -> Ok x])
+    | Some schema ->
+    match schema.kind with
+    | `Html | `Binary | `Pdf | `Url_encoded_form | `Multipart_form ->
+      [%expr fun x -> Ok x]
+    | `Json ->
+      let mod_name = Camelsnakekebab.upper_camel_case schema.name in
+      let conv_fun =
+        Ast.evar (data_module_fun_name mod_name "of_yojson")
+      in
+      [%expr of_json_string [%e conv_fun]]
 
   let path_parts path : expression =
     path
@@ -345,94 +356,95 @@ module EndpointsModule = struct
   let extra_headers (params : Params.param list) : expression =
     params
     |> List.map (fun (p : Params.param) ->
-           [%expr [%e Ast.estring p.name], [%e p.to_string] [%e p.var]])
+        [%expr [%e Ast.estring p.name], [%e p.to_string] [%e p.var]])
     |> Ast.elist
 
   let fun_with_params ~data (params : Params.t) body =
-    let open AstExt in
-    params |> Params.to_list
-    |> ListLabels.fold_right
-         ~init:(Exp.f data body) (* the last, innermost function *)
-         ~f:(fun (param : Params.param) body' ->
-           Exp.f ~label:param.name ~optional:param.optional
-             ?default:param.default param.pat body')
+    let module Exp = AstExt.Exp in
+    params
+    |> Params.to_list
+    |> ListLabels.fold_right (* "right" to preserving argument order *)
+      ~init:(Exp.f data body) (* the last, innermost function *)
+      ~f:(fun (param : Params.param) body' ->
+          (* A unary function for each parameter *)
+          Exp.f
+            ~label:param.name
+            ~optional:param.optional
+            ?default:param.default
+            param.pat
+            body')
 
   (* Extract the Ref path from a schema, if it has one *)
-  let ref_of_schema : Json_schema.schema -> string option =
-   fun s ->
-    match (Json_schema.root s).kind with
-    | Def_ref path -> Some (DataModule.json_query_path_terminal path)
-    | _ -> None
+  let ref_of_schema
+    : Json_schema.schema -> string option
+    = fun s ->
+      match (Json_schema.root s).kind with
+      | Def_ref path -> Some (DataModule.json_query_path_terminal path)
+      | _            -> None
 
-  let data_conv_and_pat : H.Message.Request.t -> expression * pattern = function
-    | { content = None; _ } -> ([%expr None], [%pat? ()])
-    | { content = Some { schema; _ }; _ } ->
-        let data_exp =
-          match schema.kind with
-          | `Json -> [%expr Some (`Json ([%e to_json_fun schema.name] data))]
-          | `Html -> [%expr Some (`Html data)]
-          | `Binary -> [%expr Some (`Binary data)]
-          | `Pdf -> [%expr Some (`Pdf data)]
-          | `Url_encoded_form ->
-            (* TODO Use Cohttp.Body.of_form *)
-            [%expr Some (`Url_encoded_form ([%e to_multipart_fun schema.name] data))]
-          | `Multipart_form ->
-              [%expr
-                Some (`Multipart_form ([%e to_multipart_fun schema.name] data))]
+  (* Serialization and content tag based on the media type *)
+  let data_converter
+    : H.schema -> expression
+    = fun schema ->
+      match schema.kind with
+      | `Html             -> [%expr Some (`Html data)]
+      | `Binary           -> [%expr Some (`Binary data)]
+      | `Pdf              -> [%expr Some (`Pdf data)]
+      | `Json             -> [%expr Some (`Json ([%e to_json_fun schema.name] data))]
+      | `Url_encoded_form -> [%expr Some (`Url_encoded_form ([%e to_multipart_fun schema.name] data))]
+      | `Multipart_form   -> [%expr Some (`Multipart_form ([%e to_multipart_fun schema.name] data))]
+
+  let operation_fun_expr
+    : Http_spec.Message.t -> structure_item
+    = fun message ->
+      let meth = Ast.pexp_variant (Http.Method.to_string message.req.meth) None in
+      let params = Params.of_openapi_parameters message.req.params in
+      let data_conv, data_pat =
+        match message.req.content with
+        | None         -> ([%expr None], [%pat? ()]) (* The data is a unit for requests with no payload (E.g.,  GET) *)
+        | Some content -> (data_converter content.schema, [%pat? data])
+      in
+      let body =
+        [%expr
+          let path    = [%e path_parts message.req.path] in
+          let params  = [%e query_params params.query] in
+          let headers = [%e extra_headers params.header] in
+          let decode  = [%e response_decoder message.resp] in
+          let data    = [%e data_conv] in
+          make_request [%e meth] ~base_url ~path ~params ~headers ~decode ?data
+        ]
+      in
+      let name = operation_function_name message.req.id in
+      [%stri let [%p name] = [%e fun_with_params ~data:data_pat params body]]
+
+  (** Construct the [Make] functor *)
+  let of_messages
+    : Http_spec.Message.t list -> string -> structure_item list
+    = fun messages base_url ->
+      let endpoint_functor =
+        let client_param =
+          AstUtil.Mod.(named_functor_param "Client" (module_type_const "Oooapi_lib.Client"))
         in
-        (data_exp, [%pat? data])
-
-  let operation_fun_expr : Http_spec.Message.t -> structure_item =
-   fun message ->
-    let name = operation_function_name message.req.id in
-    let params = Params.of_openapi_parameters message.req.params in
-    let data_conv, data_pat = data_conv_and_pat message.req in
-    let meth = Ast.pexp_variant (Http.Method.to_string message.req.meth) None in
-    let body =
-      [%expr
-        let path = [%e path_parts message.req.path] in
-        let params = [%e query_params params.query] in
-        let headers = [%e extra_headers params.header] in
-        let decode = [%e response_decoder message.resp] in
-        let data = [%e data_conv] in
-        make_request [%e meth] ~base_url ~path ~params ~headers ~decode ?data
+        let config_param =
+          AstUtil.Mod.(named_functor_param "Config" (module_type_const "Oooapi_lib.Config"))
+        in
+        let mod_impl =
+          (* Instantiate the client and also open if for direct reference *)
+          let module_declarations =
+            [ [%stri module Client = Client (Config)]
+            ; [%stri open Client]
+            ]
+          in
+          let function_definitions = messages |> List.map operation_fun_expr in
+          Ast.pmod_structure (module_declarations @ function_definitions)
+        in
+        Ast.pmod_functor client_param
+        @@ Ast.pmod_functor config_param
+        @@ mod_impl
+      in
+      [ [%stri let base_url = [%e Ast.estring base_url]]
+      ; AstUtil.Mod.binding "Make" endpoint_functor
       ]
-    in
-    [%stri let [%p name] = [%e fun_with_params ~data:data_pat params body]]
-
-  (** Construct the AST node of the module with all endpoint functions *)
-  let of_messages : Http_spec.Message.t list -> string -> structure_item list =
-   fun messages base_url ->
-    let endpoint_functor =
-      let endpoint_functor_param =
-        Named
-          ( n (Some "Client"),
-            Ast.pmty_ident (n (Astlib.Longident.parse "Oooapi_lib.Client")) )
-      in
-      let config_functor_param =
-        Named
-          ( n (Some "Config"),
-            Ast.pmty_ident (n (Astlib.Longident.parse "Oooapi_lib.Config")) )
-      in
-      let mod_impl =
-        (* Instantiate the client and also provide if for direct reference *)
-        let decls =
-          [ [%stri module Client = Cohttp_client (Config)]
-          ; [%stri open Client]
-          ]
-        in
-        let endpoint_functions = messages |> List.map operation_fun_expr in
-        Ast.pmod_structure (decls @ endpoint_functions)
-      in
-      Ast.pmod_functor endpoint_functor_param
-      @@ Ast.pmod_functor config_functor_param
-      @@ mod_impl
-    in
-    [
-      [%stri let base_url = [%e Ast.estring base_url]];
-      Ast.module_binding ~name:(n (Some "Make")) ~expr:endpoint_functor
-      |> Ast.pstr_module;
-    ]
 end
 
 let write_ast_f fmt str =
@@ -454,6 +466,6 @@ let module_of_spec : Openapi_spec.t -> Ppxlib.Ast.structure =
   [%stri let __NOTE__ = [%e Ast.estring (notice ())]]
   :: [%stri let __TITLE__ = [%e Ast.estring spec.title]]
   :: [%stri let __API_VERSION__ = [%e Ast.estring spec.version]]
-  :: [%stri open Oooapi_lib]
+  :: [%stri open Oooapi_lib [@@warning "-33"]]
   :: DataModule.of_schemata spec.schemata
-  :: EndpointsModule.of_messages spec.messages spec.base_url
+  :: ApiMakeFunctor.of_messages spec.messages spec.base_url

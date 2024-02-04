@@ -85,7 +85,7 @@ module Ast = Ast_builder.Make (struct
   let loc = loc
 end)
 
-(** An AST node for a name v *)
+(** An AST node for a located v *)
 let n v = Ast.Located.mk v
 
 module AstExt = struct
@@ -223,4 +223,17 @@ module AstExt = struct
     Ast.attribute
       ~name:(n name)
       ~payload:(PStr [ Ast.pstr_eval (Ast.pexp_ident (n ident)) [] ])
+end
+
+module Mod = struct
+  (* Module structures and types *)
+
+  let module_type_const name : module_type =
+    Ast.pmty_ident (n (Astlib.Longident.parse name))
+
+  let named_functor_param name mod_type : functor_parameter =
+    Named (n (Some name), mod_type)
+
+  let binding name structure =
+    Ast.pstr_module @@ Ast.module_binding ~name:(n (Some name)) ~expr:structure
 end
