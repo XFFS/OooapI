@@ -18,6 +18,21 @@ Check.(
 unit
 ;;
 
+test "construction of non-dags is impossible" @@ fun () ->
+let module G = DAG.Make (Int) in
+(*
+0 -> 1 -> 2 -> 3 -> 1
+*)
+let edges = [ (0, 1); (2, 3); (3, 1); (1, 2)] in
+Check.raises
+  (G.Cycle_found [ 1; 2; 3; 1 ])
+  (fun () -> ignore
+      (edges
+       |> List.fold_left (fun g (src, dst) -> G.add_arc ~src ~dst g) G.empty))
+  ~error_msg:"expected that the cycle was detected";
+unit
+;;
+
 test "can topo sort dag" @@ fun () ->
 let module G = DAG.Make (Int) in
 (*
@@ -36,3 +51,4 @@ Check.(
     (list int)
     ~error_msg:"expected nodes to be topologically sorted");
 unit
+;;
