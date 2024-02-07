@@ -245,7 +245,6 @@ module Message = struct
       { id; params; path; meth; content }
   end
 
-  (* TODO: Support different status returns? E.g. via [`200 (of_data data)] *)
   module Responses = struct
     type t = (Http.Status.t * schema) list
 
@@ -371,8 +370,6 @@ type t =
   ; schemata : schemata
   }
 
-(* TODO: doc why:  we only know what schema we'll actually need after relevant operations are constructed. As per spec  *)
-(* CLEAN UP *)
 let add_msg_schema : schemata -> Message.t -> schemata =
  fun schemata msg ->
   let schemas : schema list =

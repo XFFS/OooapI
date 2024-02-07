@@ -40,7 +40,7 @@ let type_of_string_specs
     match specs.str_format with
     | None          -> [%type: string]
     | Some "binary" -> [%type: [`File of string ]]
-    | Some "uri"    -> [%type: [`String of string]] (* TODO special support for URIs? *)
+    | Some "uri"    -> [%type: [`String of string]]
     | Some _        -> [%type: string] (*TODO What should we do with other random format vaules? *)
 
 
@@ -62,7 +62,6 @@ let rec type_of_element
     | Ext_ref _ -> failwith "unsupported: ext_ref schema"
     | Dummy -> failwith "unsupported: dummy schema"
     (* Supported schemas *)
-    (* TODO: If min and max items are equal, Array can be a tuple *)
     | Array (_, _) -> [%type: Yojson.Safe.t list], []
     | Any -> [%type: Yojson.Safe.t], []
     | Null -> [%type: unit], []
