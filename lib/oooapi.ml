@@ -183,7 +183,7 @@ module DataModule = struct
       |> get_or ~f:(fun () -> Exn.invalid ("No schema found matching reference " ^ schema_label))
       |> data_module_of_schema_entry schema_label
     in
-    let expr =
+    let expr : module_expr =
       try
         schemata
         |> ListLabels.fold_left ~init:Graph.empty ~f:add_dependency (* Build the dependency graph *)

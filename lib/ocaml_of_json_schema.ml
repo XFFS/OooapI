@@ -216,6 +216,12 @@ let type_declarations
     match root.kind with
     | Object specs -> type_decl_of_object ~name specs
     | _ ->
-      let attributes = deriving_attrs ~is_record:false in
+      let doc_comment =
+        (Option.to_list root.title @ Option.to_list root.description)
+        |> function
+        | []  -> []
+        | doc -> [doc |> String.concat "\n\n" |> AstExt.attr_str ~name:"ocaml.doc"]
+      in
+      let attributes = deriving_attrs ~is_record:false @ doc_comment in
       let typ, decls = type_of_element ~qualifier:name root in
       AstExt.Type.decl name ~attributes ~manifest:typ, decls
