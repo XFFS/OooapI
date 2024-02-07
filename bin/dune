@@ -1,4 +1,5 @@
 (executable
+ (name main)
  (public_name oooapi)
  (package oooapi)
  (libraries lib))

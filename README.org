@@ -17,17 +17,18 @@ OooapI currently supports:
 - Generating a family of OCaml types encoding the supported OpenAPI fragment's
   request and response data.
 
-* Approach
+* Aims
 
-- OooapI should produce an OCaml library satisfying the target OpenAPI spec. It
-  should not generate boilerplate for an OCaml client.
-- Extension, revision, or alteration of the generated client library should be
-  done via the OCaml module system and shadowing the generated code, not by
-  editing the generated code.
+- Given an OpenAPI server spec, OooapI should produce a completes and correct
+  OCaml client library. It should *not* generate boilerplate for an OCaml client
+  that requires manual revision.
+- If any extension, revision, or alteration of the generated client library is
+  necessary, it should be done via the OCaml module system, not by editing the
+  generated source.
 - As little code should be dynamically generated as possible. Instead, put all
-  reusable logic into a library.
+  reusable logic into the =Oooapi_lib= library.
 
-** Library principles
+** Client Library Principles
 
 - Each operation is defined as a function.
 - Everything that ends up the body of POST request is passed together as a
@@ -40,10 +41,10 @@ OooapI currently supports:
 
 * Caveat
 
-This tool, and the associated library, are meant to assist OCaml programmers who
-need to interface with servers that sepcify their API via OpenAPI. However, if
+This tool, and the associated library, is meant to assist OCaml programmers who
+need to interface with servers that specify their API via OpenAPI. However, if
 an alternative machine-readable specification is available, we would recommend
-considering it instead. Moreover, we would discourage server authors from using
+considering using it. Moreover, we would discourage server authors from using
 OpenAPI to specify their systems.
 
 We have come to the conclusion that OpenAPI and JSON Schema (upon which the
@@ -56,6 +57,7 @@ We have compiled [[./notes.org][some notes explaining the rationale for this ass
 
 Please not this assessment is purely technical, and not a judgment about the
 intentions or abilities of those who have worked so hard on these efforts.
+
 * Alternatives
 
 - [[https://github.com/OpenAPITools/openapi-generator/][OpenAPI Generator]] includes a generator that is meant to produce OCaml client boilerplate.
