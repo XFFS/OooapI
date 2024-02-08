@@ -304,10 +304,20 @@ module Message = struct
   type t =
     { req : Request.t
     ; resp : Responses.t
+    ; doc : string option
     }
 
+  let operation_docs
+    : O.operation -> string option
+    =
+    fun o ->
+    (Option.to_list o.summary @ Option.to_list o.description)
+    |> function
+    | [] -> None
+    | doc -> Some (String.concat "\n\n" doc)
+
   let of_openapi_path : O.Openapi_path.t * O.path_item -> t list =
-   fun (path, item) ->
+    fun (path, item) ->
     let path_params =
       item.parameters
       |> Option.value ~default:[]
@@ -318,44 +328,52 @@ module Message = struct
       Fun.id
       [ item.get
         |> Option.map (fun p ->
-               { req = Request.of_operation path `GET path_params p
-               ; resp = Responses.of_responses p
-               })
+            { req = Request.of_operation path `GET path_params p
+            ; resp = Responses.of_responses p
+            ; doc = operation_docs p
+            })
       ; item.put
         |> Option.map (fun p ->
-               { req = Request.of_operation path `PUT path_params p
-               ; resp = Responses.of_responses p
-               })
+            { req = Request.of_operation path `PUT path_params p
+            ; resp = Responses.of_responses p
+            ; doc = operation_docs p
+            })
       ; item.post
         |> Option.map (fun p ->
-               { req = Request.of_operation path `POST path_params p
-               ; resp = Responses.of_responses p
-               })
+            { req = Request.of_operation path `POST path_params p
+            ; resp = Responses.of_responses p
+            ; doc = operation_docs p
+            })
       ; item.delete
         |> Option.map (fun p ->
-               { req = Request.of_operation path `DELETE path_params p
-               ; resp = Responses.of_responses p
-               })
+            { req = Request.of_operation path `DELETE path_params p
+            ; resp = Responses.of_responses p
+            ; doc = operation_docs p
+            })
       ; item.options
         |> Option.map (fun p ->
-               { req = Request.of_operation path `OPTIONS path_params p
-               ; resp = Responses.of_responses p
-               })
+            { req = Request.of_operation path `OPTIONS path_params p
+            ; resp = Responses.of_responses p
+            ; doc = operation_docs p
+            })
       ; item.head
         |> Option.map (fun p ->
-               { req = Request.of_operation path `HEAD path_params p
-               ; resp = Responses.of_responses p
-               })
+            { req = Request.of_operation path `HEAD path_params p
+            ; resp = Responses.of_responses p
+            ; doc = operation_docs p
+            })
       ; item.patch
         |> Option.map (fun p ->
-               { req = Request.of_operation path `PATCH path_params p
-               ; resp = Responses.of_responses p
-               })
+            { req = Request.of_operation path `PATCH path_params p
+            ; resp = Responses.of_responses p
+            ; doc = operation_docs p
+            })
       ; item.trace
         |> Option.map (fun p ->
-               { req = Request.of_operation path `TRACE path_params p
-               ; resp = Responses.of_responses p
-               })
+            { req = Request.of_operation path `TRACE path_params p
+            ; resp = Responses.of_responses p
+            ; doc = operation_docs p
+            })
       ]
 end
 
@@ -371,11 +389,11 @@ type t =
   }
 
 let add_msg_schema : schemata -> Message.t -> schemata =
- fun schemata msg ->
+  fun schemata msg ->
   let schemas : schema list =
     (msg.req.content
-    |> Option.fold ~none:[] ~some:(fun (c : Message.Request.content) ->
-           [ c.schema ]))
+     |> Option.fold ~none:[] ~some:(fun (c : Message.Request.content) ->
+         [ c.schema ]))
     @ Message.Params.schemas msg.req.params
     @ (msg.resp |> List.map snd)
   in
@@ -390,47 +408,47 @@ let open_api_major_version s : int =
   | _ -> None
 
 let of_openapi_spec : Openapi_spec.t -> t =
- fun spec ->
+  fun spec ->
   let ({ version; title; _ } : O.info) = spec.info in
   if not (open_api_major_version spec.openapi >= 3) then
     failwith
       ("Required OpenAPI version 3 or later, spec is for version "
-      ^ spec.openapi);
+       ^ spec.openapi);
   let s = O.resolve_refs spec in
   let base_url =
     match s.servers with
     | [] ->
-        (* https://spec.openapis.org/oas/v3.1.0#openapi-object
-           > If the servers property is not provided, or is an empty array, the
-           default value would be a Server Object with a url value of /. *)
-        "/"
+      (* https://spec.openapis.org/oas/v3.1.0#openapi-object
+         > If the servers property is not provided, or is an empty array, the
+         default value would be a Server Object with a url value of /. *)
+      "/"
     | s :: _ ->
-        (* NOTE: Currently we are just using the first server.
-           What should we do if there are multiple servers? *)
-        s.url
+      (* NOTE: Currently we are just using the first server.
+         What should we do if there are multiple servers? *)
+      s.url
   in
   let schemata, messages =
     s.paths
     |> ListLabels.fold_left
-         ~init:(SM.empty, [])
-         ~f:(fun (schemata, paths) path ->
-           let msgs = Message.of_openapi_path path in
-           let scm =
-             ListLabels.fold_left ~init:schemata ~f:add_msg_schema msgs
-           in
-           (scm, msgs @ paths))
+      ~init:(SM.empty, [])
+      ~f:(fun (schemata, paths) path ->
+          let msgs = Message.of_openapi_path path in
+          let scm =
+            ListLabels.fold_left ~init:schemata ~f:add_msg_schema msgs
+          in
+          (scm, msgs @ paths))
   in
   let schemata =
     match spec.components with
     | None -> schemata
     | Some { schemas; _ } ->
-        schemas
-        |> ListLabels.fold_left
-             ~init:schemata
-             ~f:(fun schemata (name, schema) ->
-               schemata
-               |> SM.update name (function
-                      | None -> Some { name; schema; kind = `Json }
-                      | Some s -> Some s))
+      schemas
+      |> ListLabels.fold_left
+        ~init:schemata
+        ~f:(fun schemata (name, schema) ->
+            schemata
+            |> SM.update name (function
+                | None -> Some { name; schema; kind = `Json }
+                | Some s -> Some s))
   in
   { version; title; base_url; messages; schemata }
