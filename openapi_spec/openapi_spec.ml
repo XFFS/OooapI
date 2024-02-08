@@ -9,6 +9,7 @@ let of_json s =
 
 let to_json t = Openapi_j.string_of_t t
 
+(* TODO Support reading from stdin *)
 let from_file file =
   let decoder =
     if file |> String.ends_with ~suffix:".json" then
