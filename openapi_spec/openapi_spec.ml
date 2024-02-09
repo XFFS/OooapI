@@ -4,8 +4,10 @@ module Openapi_path = Openapi_path
 
 let of_json s =
   match Openapi_j.t_of_string s with
-  | spec -> Ok spec
-  | exception Yojson.Json_error err -> Error (`Msg err)
+  | spec ->
+    Ok spec
+  | exception Yojson.Json_error err ->
+    Error (`Msg (err ^ "\nInput was not JSON conforming to the OpenaAPI format."))
 
 let to_json t = Openapi_j.string_of_t t
 

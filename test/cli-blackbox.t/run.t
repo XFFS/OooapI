@@ -91,6 +91,16 @@ Can read input from stdin
   $ oooapi < tictactoe.json | tail -1
     end
 
+Report error when trying to parse invalid json
+
+  $ echo "not json" | oooapi
+  error: could not parse spec
+  Line 1, bytes 0-9:
+  Expected '{' but found 'not json
+  '
+  Input was not JSON conforming to the OpenaAPI format.
+  [1]
+
 Can generate and then compile the tictactoe spec, as specified in the dune file
 
   $ dune build
