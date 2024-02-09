@@ -9,21 +9,16 @@ let of_json s =
 
 let to_json t = Openapi_j.string_of_t t
 
-(* TODO Support reading from stdin *)
+let from_in_channel ic =
+  ic |> In_channel.input_all |> of_json
+
 let from_file file =
-  let decoder =
-    if file |> String.ends_with ~suffix:".json" then
-      of_json
-    else
-      (* TODO Support YAML input (requires a YAML parser that supports anchors etc.) *)
-      raise (Invalid_argument "Only JSON is currently supported")
-  in
   if not (Sys.file_exists file) then
     Error (`Msg ("File " ^ file ^ " does not exist or cannot be read"))
+  else if not (file |> String.ends_with ~suffix:".json") then
+    Error (`Msg ("Only JSON input is supported, expecting .json file but found " ^ file ))
   else
-    In_channel.(input_all |> with_open_text file |> decoder)
-
-(** TODO: Figure out conversion from/to YAML? *)
+    In_channel.with_open_text file from_in_channel
 
 exception Unsupported_reference of string * string
 exception Invalid_reference of string

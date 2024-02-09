@@ -4,8 +4,7 @@ include module type of Openapi_v
 val of_json : string -> (t, [ `Msg of string ]) Result.t
 val to_json : t -> string
 
-(* val of_yaml : string -> (t, [`Msg of string]) Result.t *)
-(* val to_yaml : t -> string *)
+val from_in_channel : In_channel.t -> (t, [ `Msg of string ]) Result.t
 val from_file : string -> (t, [ `Msg of string ]) Result.t
 
 exception Unsupported_reference of string * string

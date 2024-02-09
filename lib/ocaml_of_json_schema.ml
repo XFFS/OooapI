@@ -5,7 +5,6 @@ open AstUtil
 (* TODO Account for constraints, like pattern, min/max format etc.?
    This could be thru abstract types or thru validators in constructors *)
 
-
 let is_nullable
   : Json_schema.element -> bool
   =

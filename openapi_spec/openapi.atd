@@ -1,15 +1,13 @@
-
-
 (* https://spec.openapis.org/oas/v3.1.0#path-templating *)
 type path = string wrap <ocaml module="Openapi_path">
 
-(* TODO: Should comply with https://www.rfc-editor.org/rfc/rfc6838 *)
+(* TODO: Should validate so it complies with https://www.rfc-editor.org/rfc/rfc6838 *)
 type media = string
 
 (* https://spec.openapis.org/oas/v3.1.0#data-types *)
 type int32 = int <ocaml repr="int32">
 type int64 = int <ocaml repr="int64">
-type float_ = float (* TODO: Validate *)
+type float_ = float
 type double = float
 type password = string
 
@@ -66,7 +64,7 @@ type info =
 
 (* https://spec.openapis.org/oas/v3.1.0#serverObject *)
 type server =
-  { url : string (* TODO: Should this be something like a path? *)
+  { url : string
   ; ?description: string option
   (* TODO: variable values https://spec.openapis.org/oas/v3.1.0#serverVariableObject *)
   ; ?variables: (string * todo) list option <json repr="object">
@@ -128,7 +126,6 @@ type param_location =
   | Cookie <json name="cookie">
   ]
 
-(* TODO Compute defaults and validate MUSTs *)
 type parameter =
   { name
     <doc text="REQUIRED. The name of the parameter. Parameter names are case sensitive.

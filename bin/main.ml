@@ -20,10 +20,11 @@ let ok_or_handle_error result =
 
 let () =
   let spec_file = ref "" in
-  Arg.parse [] (fun f -> spec_file := f) "oooapi <spec_file>";
-  let spec =
-    match !spec_file with
-    | ""   -> failwith "argument <spec_file> must be provided"
-    | file -> file |> Openapi_spec.from_file  |> ok_or_handle_error
-  in
-  spec |> Oooapi.module_of_spec |> Oooapi.write_ast
+  Arg.parse [] (fun f -> spec_file := f) "oooapi [spec_file]";
+  !spec_file
+  |> (function
+      | ""   -> Openapi_spec.from_in_channel In_channel.stdin
+      | file -> Openapi_spec.from_file file)
+  |> ok_or_handle_error
+  |> Oooapi.module_of_spec
+  |> Oooapi.write_ast

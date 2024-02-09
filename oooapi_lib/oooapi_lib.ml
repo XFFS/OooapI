@@ -1,8 +1,6 @@
 (** This module provides a representation of the module structure
     used as a utility library for the generated OCaml client. *)
 
-(* TODO: Should this just be moved into a library that can be imported? *)
-
 (* Bring the ppxlib location in scope for the metaquote ppx *)
 module type Server = sig
   val uri : string

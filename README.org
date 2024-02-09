@@ -2,7 +2,7 @@
 
 *tl;dr*: OooapI aims to implement a solution to this problem:
 
-#+begin_src
+#+begin_src prolog
 spec:'OpenAPI spec' -> 'client library for'(spec):OCaml
 #+end_src
 
