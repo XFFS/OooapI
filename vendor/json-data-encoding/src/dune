@@ -5,7 +5,6 @@
  (modules json_data_encoding_stdlib list_override)
  (synopsis "Type-safe encoding to and decoding from JSON")
  (libraries uri)
- ; (js_of_ocaml)
  (wrapped false)
  (package openapi_spec))
 
@@ -16,7 +15,6 @@
  (modules json_encoding json_query json_repr json_schema)
  (synopsis "Type-safe encoding to and decoding from JSON")
  (libraries uri json_data_encoding_stdlib)
- ; (js_of_ocaml)
  (wrapped false)
  (package openapi_spec))
 
@@ -27,17 +25,4 @@
  (modules json_repr_bson)
  (synopsis "BSON representation of JSON documents")
  (libraries json_data_encoding ocplib-endian json_data_encoding_stdlib)
- ; (js_of_ocaml)
  (wrapped false))
-
-; TODO Causes utop to crash
-; (library
-;  (name json_data_encoding_browser)
-;  (public_name json-data-encoding-browser)
-;  (flags
-;   (:standard -w -9 -open Js_of_ocaml -open Json_data_encoding_stdlib))
-;  (modules json_repr_browser)
-;  (synopsis "Native browser representation of JSON documents")
-;  (libraries json-data-encoding js_of_ocaml json_data_encoding_stdlib)
-;  (js_of_ocaml)
-;  (wrapped false))
