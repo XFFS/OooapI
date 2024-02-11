@@ -76,12 +76,14 @@ This then also takes care of all needed dependencies!
 ** DONE Support url encoded forms
 - If in a POST then this goes in the body. We can use =Cohttp.Body.of_form=
 - If in a GET then this goes in the query param. We can use =Uri.with_query=
-** TODO Add support for application/pdf content
+** DONE Add support for application/pdf content
 ** TODO Fix all TODOs (esp. around exception raising)
-** TODO Test on multipart forms
+** DONE Test on multipart forms
 Will do in Ooapi project
 ** TODO Content conversion
 https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
+** TODO Generate Data in recrusive modules to support cycles in schemes
+This is required by https://github.com/XFFS/OooapI/issues/6
 ** TODO Automate conversion of yaml to json for specs, via yq
 ** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
 ** TODO Factor out OCaml of JSONSchema
