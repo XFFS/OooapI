@@ -33,8 +33,7 @@ module Media_kind = struct
     | "application/octet-stream" -> `Binary
     | "application/x-www-form-urlencoded" -> `Url_encoded_form
     | "application/pdf" -> `Pdf
-    | media_type ->
-        raise (Invalid_spec ("unsupported media type " ^ media_type))
+    | _ -> `Binary
 end
 
 type schema =
@@ -246,7 +245,8 @@ module Message = struct
   end
 
   module Responses = struct
-    type t = (Http.Status.t * schema) list
+    (* OpenAPI allows responses with no specified content. *)
+    type t = (Http.Status.t * schema option) list
 
     let of_responses : O.operation -> t =
      fun oper ->
@@ -266,13 +266,7 @@ module Message = struct
              let response =
                match resp.content with
                | None
-               | Some [] ->
-                   raise
-                     (Invalid_spec
-                        (Printf.sprintf
-                           "Response for code %s has no content. Why does \
-                            OpenAPI allow this?"
-                           code))
+               | Some [] -> None
                | Some ((media_type, c) :: _) ->
                match c.schema with
                | None ->
@@ -296,7 +290,7 @@ module Message = struct
                          in
                          op_id ^ "_response"
                    in
-                   { kind; name; schema }
+                   Some { kind; name; schema }
              in
              (status, response))
   end
@@ -395,7 +389,7 @@ let add_msg_schema : schemata -> Message.t -> schemata =
      |> Option.fold ~none:[] ~some:(fun (c : Message.Request.content) ->
          [ c.schema ]))
     @ Message.Params.schemas msg.req.params
-    @ (msg.resp |> List.map snd)
+    @ (msg.resp |> List.filter_map snd)
   in
   schemas
   |> ListLabels.fold_left ~init:schemata ~f:(fun ss s -> SM.add s.name s ss)
