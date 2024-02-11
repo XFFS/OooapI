@@ -332,7 +332,7 @@ module ApiMakeFunctor = struct
 
   (* TODO Generalize for any supported responses, including default *)
   let response_decoder (responses : H.Message.Responses.t) : expression =
-    match responses |> List.assoc_opt `OK with
+    match responses |> List.assoc_opt `OK |> Option.join with
     | None ->
       (* TODO 200 is required only when it is the ONLY response. So need to account for others *)
       (* https://spec.openapis.org/oas/v3.1.0#responses-object *)

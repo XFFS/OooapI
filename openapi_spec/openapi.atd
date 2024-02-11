@@ -195,7 +195,7 @@ type media_type =
   }
 
 type response =
-  { description
+  { ~description
     <doc text="REQUIRED. A description of the response. CommonMark syntax MAY be used for rich text representation.">
   : string
   ; ?headers
