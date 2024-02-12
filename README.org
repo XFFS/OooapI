@@ -71,9 +71,15 @@ intentions or abilities of those who have worked so hard on these efforts.
   supported. Anything else is treated as untyped JSON.
 ** Media types
 - Proper serialization support is only provided for JSON and multi-part forms,
-  al other media types are passed along as unserialized binary strings.
+  all other media types are passed along as unserialized binary strings.
+- Proper serialization support is only provided for JSON, all other media types
+  are passed along as unserialized binary strings.
 ** Recursive scheme definitions are not supported
 - This is used, for instance, in Stripe's API
+** Responses
+- Deserialization is only automated for the first [[https://spec.openapis.org/oas/latest.html#responsesObject][ResponseObject]] handling a
+  success code, any other responses are returned by an operation function as raw
+  data in an error result.
 
 * Motivation
 

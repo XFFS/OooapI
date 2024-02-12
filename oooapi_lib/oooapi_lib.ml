@@ -111,23 +111,49 @@ end
 
 module Response = struct
   type error =
-    [ `Request of Cohttp.Code.status_code * string
-    | `Deseriaization of string * string
+    [ `Request of Cohttp.Code.status_code * string (** The error status code and the error response data *)
+    | `Deseriaization of string * string (* The unserialized data and the error message *)
     ]
 
   type 'a t = ('a, error) result Lwt.t
+
+  (** A functions for handling the single expected successful server response
+
+      A value [(is_success, decode) : t decoder] is expected be behave as follows:
+
+      - [decode resp_data = Ok resp] when when [is_success resp_code = True] and
+        the [resp_data] is successfully deserialized into [resp]
+      - [decode resp_data = Error err] when [is_success resp_code = True] and handling
+        the response fails because the [resp_data] cannot be successfully
+        deserialized.
+
+      Any response with a code that doesn't match the expected [i] will be
+      available an the [error] of a request, even if it also sucessful.
+
+      Using a function [is_success] is more general than is usually needed,
+      but it enables us to support handling ranges of successful responses,
+      and the degenerate (but for some reason allowed case), when a spec
+      does not list any success response.
+
+      NOTE: The limitation to only handling a single successful status code is
+      made to provide a simpler API. If we supported multiple success responses,
+      which might have different data in each case, users would need to be
+      prepared to handle every variant returned on success. We can revisit this
+      limitation if we find it excessive. *)
+  type 'resp decoder = (int -> bool) * (string -> ('resp, string) result)
 end
 
 module type Client = functor (_ : Config) -> sig
   val of_json_string : (Yojson.Safe.t -> 'a) -> string -> 'a
 
+  (** Make an HTTP request *)
   val make_request
      : ?data:Request.data
     -> base_url:string
     -> path:string list
     -> params:(string * string) list
     -> headers:(string * string) list
-    -> decode:(string -> ('resp, string) result)
+    -> decode:'resp Response.decoder
     -> Cohttp.Code.meth
     -> 'resp Response.t
 end
@@ -160,7 +186,7 @@ module Cohttp_client : Client = functor (Config : Config) -> struct
       ~(path : string list)
       ~(params : (string * string) list)
       ~(headers : (string * string) list)
-      ~(decode : string -> ('resp, string) result)
+      ~(decode : 'resp Response.decoder)
       (meth : Cohttp.Code.meth) : 'resp Response.t =
     let open Lwt.Syntax in
     let uri =
@@ -202,10 +228,11 @@ module Cohttp_client : Client = functor (Config : Config) -> struct
       Cohttp_lwt_unix.Client.call ~headers:req_headers ?body meth uri
     in
     let+ resp_body_str = Cohttp_lwt.Body.to_string resp_body in
-    match resp.status with
-    | `OK -> (
-        match decode resp_body_str with
-        | Ok resp_data -> Ok resp_data
-        | Error e -> Error (`Deseriaization (resp_body_str, e)))
-    | other -> Error (`Request (other, resp_body_str))
+    let (is_success, decoder) = decode in
+    if is_success (Cohttp.Code.code_of_status resp.status) then
+      match decoder resp_body_str with
+      | Ok resp_data -> Ok resp_data
+      | Error e -> Error (`Deseriaization (resp_body_str, e))
+    else
+      Error (`Request (resp.status, resp_body_str))
 end

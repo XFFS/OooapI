@@ -48,7 +48,7 @@ type schema =
    > A client sends requests to a server in the form of a request message with a method (Section 9) and request target (Section 7.1). The request
    might also contain header fields (Section 6.3) for request modifiers, client information, and representation metadata, content (Section 6.4)
    intended for processing in accordance with the method, and trailer fields (Section 6.5) to communicate information collected while sending
-   the content.¶
+   the content.
    >
    > A server responds to a client's request by sending one or more response messages, each including a status code (Section 15). The response
    might also contain header fields for server information, resource metadata, and representation metadata, content to be interpreted in

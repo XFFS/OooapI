@@ -330,23 +330,30 @@ module ApiMakeFunctor = struct
     let mod_name = Camelsnakekebab.upper_camel_case mod_name in
     Ast.evar (data_module_fun_name mod_name "to_multipart")
 
-  (* TODO Generalize for any supported responses, including default *)
+  (* Constructs an expression of type ['resp Oooapi_lib.Response.decoder]
+     used to handle the first successful response defined in the schema. *)
   let response_decoder (responses : H.Message.Responses.t) : expression =
-    match responses |> List.assoc_opt `OK |> Option.join with
+    let find_first_success (status, schema) =
+      let code = Http.Status.to_int status in
+      if 200 <= code && code <= 299 then
+        schema |> Option.map (fun s -> (code, s))
+      else
+        None
+    in
+    match responses |> List.find_map find_first_success with
     | None ->
-      (* TODO 200 is required only when it is the ONLY response. So need to account for others *)
-      (* https://spec.openapis.org/oas/v3.1.0#responses-object *)
-      Exn.invalid_data "Invalid schema: no 200 response"
-    | Some schema ->
-      match schema.kind with
-      | `Html | `Binary | `Pdf | `Url_encoded_form | `Multipart_form ->
-        [%expr fun x -> Ok x]
-      | `Json ->
-        let mod_name = Camelsnakekebab.upper_camel_case schema.name in
-        let conv_fun =
-          Ast.evar (data_module_fun_name mod_name "of_yojson")
-        in
-        [%expr of_json_string [%e conv_fun]]
+      [%expr (fun _ -> true, fun x -> Ok x) (* XXX: Spec defines no successful response for this operation *)]
+    | Some (code, schema) ->
+    let is_success_fun = [%expr fun c -> c = [%e Ast.eint code]] in
+    match schema.kind with
+    | `Html | `Binary | `Pdf | `Url_encoded_form | `Multipart_form ->
+      [%expr ([%e is_success_fun], fun x -> Ok x)]
+    | `Json ->
+      let mod_name = Camelsnakekebab.upper_camel_case schema.name in
+      let conv_fun =
+        Ast.evar (data_module_fun_name mod_name "of_yojson")
+      in
+      [%expr ([%e is_success_fun], of_json_string [%e conv_fun])]
 
   let path_parts path : expression =
     path
