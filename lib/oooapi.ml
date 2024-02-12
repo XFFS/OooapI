@@ -443,8 +443,11 @@ module ApiMakeFunctor = struct
       in
       let name = operation_function_name message.req.id in
       match message.doc with
-      | None     -> [%stri let [%p name] = [%e fun_with_params ~data:data_pat params body] ]
-      | Some doc -> [%stri let [%p name] = [%e fun_with_params ~data:data_pat params body] [@@ocaml.doc [%e Ast.estring doc]]]
+      | None ->
+        [%stri let [%p name] = [%e fun_with_params ~data:data_pat params body] ]
+      | Some doc ->
+        [%stri let [%p name] = [%e fun_with_params ~data:data_pat params body]
+               [@@ocaml.doc [%e Ast.estring doc]]]
 
   (** Construct the [Make] functor *)
   let of_messages
