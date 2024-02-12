@@ -1,0 +1,18 @@
+(rule
+ (target github_api.ml)
+ (deps %{bin:oooapi}
+       (:spec ghec.json))
+ (action
+  (with-stdout-to %{target}
+    (run oooapi %{spec}))))
+
+(library
+ (name github_api)
+ (modules github_api)
+ (libraries oooapi_lib)
+ (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
+
+; (executable
+;  (public_name test_openai)
+;  (modules test_openai)
+;  (libraries openai_api cohttp-lwt-unix))
