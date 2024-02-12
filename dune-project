@@ -34,6 +34,7 @@
 providing all dependencies needed by OooapI generated clients")
  (depends
   (dune (> 2.9))
+  (ocaml (>= 5.0))
 
   openapi_spec
 
