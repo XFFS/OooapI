@@ -35,7 +35,7 @@ let rec module_name_of_def_ref
   : Json_query.path -> string
   = function
   | []           -> failwith "invalid component query path"
-  | [ `Field n ] -> Camelsnakekebab.upper_camel_case n
+  | [ `Field n ] -> AstExt.to_module_name n
   | _ :: rest    -> module_name_of_def_ref rest
 
 let type_name_of_def_ref

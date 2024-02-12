@@ -91,19 +91,38 @@ let n v = Ast.Located.mk v
 module AstExt = struct
   (* Extensions to ppixlib's `Ast` module *)
 
+  let sanatize
+    : string -> string
+    =
+    fun s -> s |> String.map (fun c -> match c with
+        | 'A'..'Z'
+        | 'a'..'z'
+        | '0'..'9'
+        | '_' ->
+          c
+        | _ ->
+          '_')
+
   let to_module_name s =
-    let camel_case = Camelsnakekebab.upper_camel_case s in
+    let camel_case =
+      s
+      |> sanatize
+      |> Camelsnakekebab.upper_camel_case
+    in
     match String.get s 0 with
     | 'A' .. 'Z' -> camel_case
-    | _ -> "O" ^ s
+    | _ -> "O" ^ camel_case
 
   let to_identifier s =
-    s
-    |> String.map (function
-           | '/' -> '-'
-           | c -> c)
-    |> Camelsnakekebab.lower_snake_case
-    |> OcamlBuiltins.sanitize
+    let snake_case =
+      s
+      |> sanatize
+      |> Camelsnakekebab.lower_snake_case
+      |> OcamlBuiltins.sanitize
+    in
+    match String.get snake_case 0 with
+    | 'a' .. 'z' | '_' -> snake_case
+    | _ -> "_" ^ snake_case
 
   module Type = struct
     (** Create a core type from a type description *)
