@@ -80,6 +80,12 @@ intentions or abilities of those who have worked so hard on these efforts.
 - Deserialization is only automated for the first [[https://spec.openapis.org/oas/latest.html#responsesObject][ResponseObject]] handling a
   success code, any other responses are returned by an operation function as raw
   data in an error result.
+** Parameters
+- OpenAPI "parameters" are unruly and the spec makes it hard to work with them
+  correctly, as a result we only have basic support for most "parameters". In
+  particular, we do not have full support for complex, custom data-structures in
+  parameters. Instead, these are just treated as untyped json. Custom defined
+  shadowing functions may be needed to serialize them correctly.
 
 * Motivation
 

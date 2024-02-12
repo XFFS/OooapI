@@ -6,6 +6,9 @@ module type Server = sig
   val uri : string
 end
 
+
+let of_json_string f s = f (Yojson.Safe.from_string s)
+
 module type Config = sig
   val bearer_token : string option
   (** A token added as a bearer in the [Authorization] header*)
@@ -102,10 +105,12 @@ end = struct
 end
 
 module Request = struct
+  (* TODO Expands support for media types *)
   type data =
     [ `Json of Yojson.Safe.t
     | `Multipart_form of Multipart.part list
     | `Url_encoded_form of Multipart.part list
+    | `Binary of string
     ]
 end
 
@@ -117,35 +122,34 @@ module Response = struct
 
   type 'a t = ('a, error) result Lwt.t
 
+  (* TODO Extend to support ranges? *)
+  type success_code =
+    [ `Any (** Match any success *)
+    | `Code of int (** Match just the exact int *)
+    ]
+
   (** A functions for handling the single expected successful server response
 
-      A value [(is_success, decode) : t decoder] is expected be behave as follows:
+      A value [(code, decode) : t decoder] is expected be behave as follows:
 
-      - [decode resp_data = Ok resp] when when [is_success resp_code = True] and
+      - [decode resp_data = Ok resp] when when the status code matches [code] and
         the [resp_data] is successfully deserialized into [resp]
-      - [decode resp_data = Error err] when [is_success resp_code = True] and handling
+      - [decode resp_data = Error err] when the status code matches [code] and handling
         the response fails because the [resp_data] cannot be successfully
         deserialized.
 
-      Any response with a code that doesn't match the expected [i] will be
-      available an the [error] of a request, even if it also sucessful.
-
-      Using a function [is_success] is more general than is usually needed,
-      but it enables us to support handling ranges of successful responses,
-      and the degenerate (but for some reason allowed case), when a spec
-      does not list any success response.
+      Any response with a code that doesn't match the [code] will be available
+      an the [error] of a request, even if it also sucessful.
 
       NOTE: The limitation to only handling a single successful status code is
       made to provide a simpler API. If we supported multiple success responses,
       which might have different data in each case, users would need to be
       prepared to handle every variant returned on success. We can revisit this
       limitation if we find it excessive. *)
-  type 'resp decoder = (int -> bool) * (string -> ('resp, string) result)
+  type 'resp decoder = success_code * (string -> ('resp, string) result)
 end
 
 module type Client = functor (_ : Config) -> sig
-  val of_json_string : (Yojson.Safe.t -> 'a) -> string -> 'a
-
   (** Make an HTTP request *)
   val make_request
      : ?data:Request.data
@@ -178,8 +182,6 @@ module Cohttp_client : Client = functor (Config : Config) -> struct
       List.map (function | (label, `String value) -> (label, [value])
                          | (field, `File _) -> raise (Unsupported ("`File value not supported in url-encoded form, but specified for field" ^ field)))
 
-  let of_json_string f s = f (Yojson.Safe.from_string s)
-
   let make_request
       ?(data : Request.data option)
       ~(base_url : string)
@@ -198,16 +200,19 @@ module Cohttp_client : Client = functor (Config : Config) -> struct
     let* (body, content_headers, uri) =
       match data with
       | None -> Lwt.return (None, [], uri)
+      | Some (`Binary data) ->
+        let data = Cohttp_lwt.Body.of_string data in
+        Lwt.return (Some data, [ ("Content-Type", "text/plain") ], uri)
       | Some (`Json data_json) ->
-          let data_str = Yojson.Safe.to_string data_json in
-          let data_body = Cohttp_lwt.Body.of_string data_str in
-          Lwt.return (Some data_body, [ ("Content-Type", "application/json") ], uri)
+        let data_str = Yojson.Safe.to_string data_json in
+        let data_body = Cohttp_lwt.Body.of_string data_str in
+        Lwt.return (Some data_body, [ ("Content-Type", "application/json") ], uri)
       | Some (`Multipart_form data_parts) ->
-          let* form = Multipart.form_of_data data_parts in
-          let headers, data_body =
-            Multipart_form_cohttp.Client.multipart_form form
-          in
-          Lwt.return (Some data_body, Cohttp.Header.to_list headers, uri)
+        let* form = Multipart.form_of_data data_parts in
+        let headers, data_body =
+          Multipart_form_cohttp.Client.multipart_form form
+        in
+        Lwt.return (Some data_body, Cohttp.Header.to_list headers, uri)
       | Some (`Url_encoded_form data_parts) ->
         let fields = url_form_data_of_multipart_data data_parts in
         match meth with
@@ -228,11 +233,16 @@ module Cohttp_client : Client = functor (Config : Config) -> struct
       Cohttp_lwt_unix.Client.call ~headers:req_headers ?body meth uri
     in
     let+ resp_body_str = Cohttp_lwt.Body.to_string resp_body in
-    let (is_success, decoder) = decode in
-    if is_success (Cohttp.Code.code_of_status resp.status) then
+    let (success_code, decoder) = decode in
+    let succes_matches =
+    match success_code with
+    | `Any    -> true
+    | `Code c -> Int.equal c (Cohttp.Code.code_of_status resp.status)
+    in
+    if succes_matches then
       match decoder resp_body_str with
       | Ok resp_data -> Ok resp_data
-      | Error e -> Error (`Deseriaization (resp_body_str, e))
+      | Error e      -> Error (`Deseriaization (resp_body_str, e))
     else
       Error (`Request (resp.status, resp_body_str))
 end

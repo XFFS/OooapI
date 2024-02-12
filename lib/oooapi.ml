@@ -72,8 +72,8 @@ module DataModule = struct
         | [%type: Yojson.Safe.t] -> [%expr fun j -> `String (Yojson.Safe.to_string j)]
 
         (* We cast from the narrower [[`String]] or [[`File]] into the wider [Multipart.part_data] *)
-        | [%type: [`String of string]] -> [%expr fun s -> (s :> Multipart.part_data)]
-        | [%type: [`File of string ]]  -> [%expr fun f -> (f :> Multipart.part_data)]
+        | [%type: [`String of string]] -> [%expr fun s -> (s :> Ooo.Multipart.part_data)]
+        | [%type: [`File of string ]]  -> [%expr fun f -> (f :> Ooo.Multipart.part_data)]
 
         (* TODO: Add support for, e.g., "deepObjects": https://github.com/OAI/OpenAPI-Specification/issues/1706*)
         | unsupported_type ->
@@ -115,7 +115,7 @@ module DataModule = struct
   let data_module_of_schema_entry
     : string -> Http_spec.schema -> structure_item
     = fun name schema ->
-      let name_str = Camelsnakekebab.upper_camel_case name in
+      let name_str = AstExt.to_module_name name in
       let name = n (Some name_str) in
       let main_decl, declarations = Ocaml_of_json_schema.type_declarations schema.schema.schema in
       let type_declarations =
@@ -213,7 +213,6 @@ end
     {|
     module Make (Client: Oooapy_lib.Client) (Config: Oooapy_lib.Config) = struct
       module Client = Client (Config)
-      open Client
 
       let base_url = "https://foo/bar/baz"
 
@@ -252,6 +251,8 @@ module ApiMakeFunctor = struct
     let of_http_spec_param
       : string * H.Message.Params.param -> param
       = fun (name, p) ->
+        (* Sanitize the name to avoid clashes with builtins *)
+        let name = AstExt.to_identifier name in
         let var = Ast.evar name in
         let pat = Ast.pvar name in
         let optional = not p.required in
@@ -261,15 +262,16 @@ module ApiMakeFunctor = struct
           let to_string, typ =
             let t = Ocaml_of_json_schema.type_of_element ~qualifier:"not_applicable____" elem |> fst in
             match t with
-            | [%type: string]      -> ([%expr fun x -> x], t)
-            | [%type: string list] -> ([%expr fun x -> String.concat "," x], t)
-            | [%type: bool]        -> ([%expr string_of_bool], t)
-            | [%type: int]         -> ([%expr string_of_int], t)
-            | [%type: float]       -> ([%expr string_of_float], t)
+            | [%type: string]        -> ([%expr fun x -> x], t)
+            | [%type: string option] -> ([%expr Option.get], t)
+            | [%type: string list]   -> ([%expr fun x -> String.concat "," x], t)
+            | [%type: bool]          -> ([%expr string_of_bool], t)
+            | [%type: int]           -> ([%expr string_of_int], t)
+            | [%type: float]         -> ([%expr string_of_float], t)
             (* TODO: Add support for complex types *)
             | unsupported_typ      ->
               (Printf.eprintf
-                 "ERROR: parameters of type %s not supported for parameter %s, using JSON as fallback. This is probably invalid\n"
+                 "WARNING: Parameters of type %s not supported for parameter %s, using JSON as fallback. This may be invalid\n"
                  (string_of_core_type unsupported_typ)
                  name);
               ([%expr Yojson.Safe.to_string], [%type: Yojson.Safe.t])
@@ -320,7 +322,8 @@ module ApiMakeFunctor = struct
   let operation_function_name operation_id =
     operation_id |> AstExt.to_identifier |> AstExt.Pat.var
 
-  let data_module_fun_name name f = Printf.sprintf "Data.%s.%s" name f
+  let data_module_fun_name name f =
+    Printf.sprintf "Data.%s.%s" (AstExt.to_module_name name) f
 
   let to_json_fun mod_name : expression =
     let mod_name = Camelsnakekebab.upper_camel_case mod_name in
@@ -342,18 +345,18 @@ module ApiMakeFunctor = struct
     in
     match responses |> List.find_map find_first_success with
     | None ->
-      [%expr (fun _ -> true, fun x -> Ok x) (* XXX: Spec defines no successful response for this operation *)]
+      [%expr (`Any, fun x -> Ok x) (* XXX: Spec defines no successful response for this operation *)]
     | Some (code, schema) ->
-    let is_success_fun = [%expr fun c -> c = [%e Ast.eint code]] in
+    let success_code = [%expr `Code [%e Ast.eint code]] in
     match schema.kind with
     | `Html | `Binary | `Pdf | `Url_encoded_form | `Multipart_form ->
-      [%expr ([%e is_success_fun], fun x -> Ok x)]
+      [%expr ([%e success_code], fun x -> Ok x)]
     | `Json ->
       let mod_name = Camelsnakekebab.upper_camel_case schema.name in
       let conv_fun =
         Ast.evar (data_module_fun_name mod_name "of_yojson")
       in
-      [%expr ([%e is_success_fun], of_json_string [%e conv_fun])]
+      [%expr ([%e success_code], Ooo.of_json_string [%e conv_fun])]
 
   let path_parts path : expression =
     path
@@ -433,12 +436,19 @@ module ApiMakeFunctor = struct
       in
       let body =
         [%expr
-          let path    = [%e path_parts message.req.path] in
-          let params  = [%e query_params params.query] in
-          let headers = [%e extra_headers params.header] in
-          let decode  = [%e response_decoder message.resp] in
-          let data    = [%e data_conv] in
-          make_request [%e meth] ~base_url ~path ~params ~headers ~decode ?data
+          let _ooo_path    = [%e path_parts message.req.path] in
+          let _ooo_params  = [%e query_params params.query] in
+          let _ooo_headers = [%e extra_headers params.header] in
+          let _ooo_decode  = [%e response_decoder message.resp] in
+          let _ooo_data    = [%e data_conv] in
+          Client.make_request
+            [%e meth]
+            ~base_url
+            ~path:_ooo_path
+            ~params:_ooo_params
+            ~headers:_ooo_headers
+            ~decode:_ooo_decode
+            ?data:_ooo_data
         ]
       in
       let name = operation_function_name message.req.id in
@@ -461,14 +471,11 @@ module ApiMakeFunctor = struct
           AstUtil.Mod.(named_functor_param "Config" (module_type_const "Oooapi_lib.Config"))
         in
         let mod_impl =
-          (* Instantiate the client and also open if for direct reference *)
-          let module_declarations =
-            [ [%stri module Client = Client (Config)]
-            ; [%stri open Client]
-            ]
-          in
           let function_definitions = messages |> List.map operation_fun_expr in
-          Ast.pmod_structure (module_declarations @ function_definitions)
+          Ast.pmod_structure (
+            [%stri module Client = Client (Config)]
+            :: function_definitions
+          )
         in
         Ast.pmod_functor client_param
         @@ Ast.pmod_functor config_param
@@ -499,7 +506,7 @@ let module_of_spec
     [ [%stri let __NOTE__ = [%e Ast.estring (notice ())] ]
     ; [%stri let __TITLE__ = [%e Ast.estring spec.title] ]
     ; [%stri let __API_VERSION__ = [%e Ast.estring spec.version] ]
-    ; [%stri open Oooapi_lib [@@warning "-33"] ]
+    ; [%stri module Ooo = Oooapi_lib ]
     ; [%stri let base_url = [%e Ast.estring spec.base_url] ]
     ; data_module
     ; api_functor

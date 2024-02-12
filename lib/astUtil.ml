@@ -91,7 +91,7 @@ let n v = Ast.Located.mk v
 module AstExt = struct
   (* Extensions to ppixlib's `Ast` module *)
 
-  let sanatize
+  let sanitize
     : string -> string
     =
     fun s -> s |> String.map (fun c -> match c with
@@ -100,23 +100,24 @@ module AstExt = struct
         | '0'..'9'
         | '_' ->
           c
+        | '+' -> 'p' (* Special case to handle github's "+1" property *)
         | _ ->
           '_')
 
   let to_module_name s =
     let camel_case =
       s
-      |> sanatize
+      |> sanitize
       |> Camelsnakekebab.upper_camel_case
     in
-    match String.get s 0 with
+    match String.get camel_case 0 with
     | 'A' .. 'Z' -> camel_case
     | _ -> "O" ^ camel_case
 
   let to_identifier s =
     let snake_case =
       s
-      |> sanatize
+      |> sanitize
       |> Camelsnakekebab.lower_snake_case
       |> OcamlBuiltins.sanitize
     in

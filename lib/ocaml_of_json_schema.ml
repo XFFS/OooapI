@@ -155,7 +155,16 @@ and record_label
     -> label_declaration * type_declaration list
   =
   fun ~type_name (field_name, element, required, _) ->
-  let fname = AstExt.to_identifier field_name in
+  let fname =
+    AstExt.to_identifier @@
+    if String.equal type_name "t" then
+      (* Top-level types don't need a prefix *)
+      field_name
+    else
+      (* Prefix each field label with the type name to avoid
+         clashes between different types *)
+      (type_name ^ "_" ^ field_name)
+  in
   let pld_type, declarations =
     let field_type, decls = type_of_element ~qualifier:fname element in
     let field_type = if required then field_type else [%type: [%t field_type] option] in
@@ -188,13 +197,7 @@ and record_label
     in
     doc_attr @ key_attr @ make_attrs @ yojson_attrs
   in
-  let pld_name =
-    if String.equal type_name "t" then n fname
-    else
-      (* Prefix each field label with the type name to avoid
-         label clashes between different types *)
-      n (type_name ^ "_" ^ fname)
-  in
+  let pld_name = n fname in
   let label_type = {pld_type; pld_attributes; pld_name; pld_mutable = Immutable; pld_loc = loc;} in
   label_type, declarations
 

@@ -19,3 +19,8 @@
  ; The `=false` sets the default value, so we only run these tests if
  ; LOCAL_TESTS is `true`.
  (enabled_if %{env:LOCAL_TESTS=false}))
+
+(cram
+ (deps
+  %{bin:oooapi}
+  %{bin:dune}))

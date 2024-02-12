@@ -48,6 +48,11 @@ different way.
 ** Treatment of fields is inconsistent
 E.g., the =description= field is, for no noted reason, required for =response
 objects=, while it is optional for (nearly?) every other object.
+** JSON Schema allows absurd data structures:
+
+How is something like this meant to be supported in the native data structures
+of any common PL in a general purpose way?
+https://github.com/xffs/OooapI/blob/dcc649efe09cac684d66135e7e7521d6013722c4/test/github-blackbox.t/ghec.json#L270718-L270723
 
 * Constructing OCaml
 

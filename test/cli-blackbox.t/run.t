@@ -18,7 +18,7 @@ Can generate an implementation for the tictactoe spec
   $ oooapi tictactoe.json | tail -n +2
   let __TITLE__ = "Tic Tac Toe"
   let __API_VERSION__ = "1.0.0"
-  open Oooapi_lib[@@warning "-33"]
+  module Ooo = Oooapi_lib
   let base_url = "/"
   module Data =
     struct
@@ -56,34 +56,36 @@ Can generate an implementation for the tictactoe spec
   module Make(Client:Oooapi_lib.Client)(Config:Oooapi_lib.Config) =
     struct
       module Client = (Client)(Config)
-      open Client
       let get_square ~column  ~row  () =
-        let path = ["board"; row; column] in
-        let params = List.filter_map Fun.id [] in
-        let headers = [] in
-        let decode = of_json_string Data.Mark.of_yojson in
-        let data = None in
-        make_request `GET ~base_url ~path ~params ~headers ~decode ?data
-        [@@ocaml.doc
-          "Get a single board square\n\nRetrieves the requested square."]
+        let _ooo_path = ["board"; row; column] in
+        let _ooo_params = List.filter_map Fun.id [] in
+        let _ooo_headers = [] in
+        let _ooo_decode =
+          ((`Code 200), (Ooo.of_json_string Data.Mark.of_yojson)) in
+        let _ooo_data = None in
+        Client.make_request `GET ~base_url ~path:_ooo_path ~params:_ooo_params
+          ~headers:_ooo_headers ~decode:_ooo_decode ?data:_ooo_data[@@ocaml.doc
+                                                                     "Get a single board square\n\nRetrieves the requested square."]
       let put_square ~column  ~row  data =
-        let path = ["board"; row; column] in
-        let params = List.filter_map Fun.id [] in
-        let headers = [] in
-        let decode = of_json_string Data.Status.of_yojson in
-        let data = Some (`Json (Data.Mark.to_yojson data)) in
-        make_request `PUT ~base_url ~path ~params ~headers ~decode ?data
-        [@@ocaml.doc
-          "Set a single board square\n\nPlaces a mark on the board and retrieves the whole board and the winner (if any)."]
+        let _ooo_path = ["board"; row; column] in
+        let _ooo_params = List.filter_map Fun.id [] in
+        let _ooo_headers = [] in
+        let _ooo_decode =
+          ((`Code 200), (Ooo.of_json_string Data.Status.of_yojson)) in
+        let _ooo_data = Some (`Json (Data.Mark.to_yojson data)) in
+        Client.make_request `PUT ~base_url ~path:_ooo_path ~params:_ooo_params
+          ~headers:_ooo_headers ~decode:_ooo_decode ?data:_ooo_data[@@ocaml.doc
+                                                                     "Set a single board square\n\nPlaces a mark on the board and retrieves the whole board and the winner (if any)."]
       let get_board () =
-        let path = ["board"] in
-        let params = List.filter_map Fun.id [] in
-        let headers = [] in
-        let decode = of_json_string Data.Status.of_yojson in
-        let data = None in
-        make_request `GET ~base_url ~path ~params ~headers ~decode ?data
-        [@@ocaml.doc
-          "Get the whole board\n\nRetrieves the current state of the board and the winner."]
+        let _ooo_path = ["board"] in
+        let _ooo_params = List.filter_map Fun.id [] in
+        let _ooo_headers = [] in
+        let _ooo_decode =
+          ((`Code 200), (Ooo.of_json_string Data.Status.of_yojson)) in
+        let _ooo_data = None in
+        Client.make_request `GET ~base_url ~path:_ooo_path ~params:_ooo_params
+          ~headers:_ooo_headers ~decode:_ooo_decode ?data:_ooo_data[@@ocaml.doc
+                                                                     "Get the whole board\n\nRetrieves the current state of the board and the winner."]
     end
 
 Can read input from stdin
