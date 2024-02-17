@@ -11,11 +11,7 @@ bug-reports: "https://github.com/shonfeder/ooopai/issues"
 depends: [
   "dune" {>= "3.7" & > "2.9"}
   "openapi_spec"
-  "ppxlib" {>= "0.28.0"}
-  "camelsnakekebab" {>= "0.4"}
-  "http" {>= "6.0.0~alpha1"}
-  "ppx_expect" {with-test & >= "v0.15.1"}
-  "tezt" {with-test}
+  "ocamlformat" {with-test}
   "odoc" {with-doc}
 ]
 build: [

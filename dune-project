@@ -18,13 +18,7 @@
 
   openapi_spec
 
-  (ppxlib (>= 0.28.0))
-  (camelsnakekebab (>= 0.4))
-  (http (>= 6.0.0~alpha1))
-
-  ; Test deps
-  (ppx_expect (and :with-test (>= v0.15.1)))
-  (tezt :with-test)))
+  (ocamlformat :with-test)))
 
 (package
  (name oooapi_lib)
