@@ -20,7 +20,7 @@ let main =
     | Error (`Request (_, s)) ->
         let* () = Lwt_io.printl "list_models: request failed" in
         Lwt_io.printl s
-    | Error (`Deseriaization (resp, err)) ->
+    | Error (`Deserialization (resp, err)) ->
         let* () = Lwt_io.printl "list_models: deser failed" in
         let* () = Lwt_io.printl err in
         Lwt_io.printl resp
@@ -43,7 +43,7 @@ let main =
     | Error (`Request (_, s)) ->
         let* () = Lwt_io.printl "create_completion: request failed" in
         Lwt_io.printl s
-    | Error (`Deseriaization (resp, err)) ->
+    | Error (`Deserialization (resp, err)) ->
         let* () = Lwt_io.printl "create_completion: deser failed" in
         let* () = Lwt_io.printl err in
         Lwt_io.printl resp

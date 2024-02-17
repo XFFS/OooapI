@@ -89,6 +89,11 @@ Will do in Ooapi project
 https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
 ** TODO Generate Data in recrusive modules to support cycles in schemes
 This is required by https://github.com/XFFS/OooapI/issues/6
+** TODO Report SO on compilation
+Related to
+
+- https://github.com/ocaml/ocaml/issues/11803
+- https://github.com/janestreet/parsexp/issues/10
 ** TODO Automate conversion of yaml to json for specs, via yq
 ** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
 ** TODO Factor out OCaml of JSONSchema

@@ -117,7 +117,7 @@ end
 module Response = struct
   type error =
     [ `Request of Cohttp.Code.status_code * string (** The error status code and the error response data *)
-    | `Deseriaization of string * string (* The unserialized data and the error message *)
+    | `Deserialization of string * string (* The unserialized data and the error message *)
     ]
 
   type 'a t = ('a, error) result Lwt.t
@@ -242,7 +242,7 @@ module Cohttp_client : Client = functor (Config : Config) -> struct
     if succes_matches then
       match decoder resp_body_str with
       | Ok resp_data -> Ok resp_data
-      | Error e      -> Error (`Deseriaization (resp_body_str, e))
+      | Error e      -> Error (`Deserialization (resp_body_str, e))
     else
       Error (`Request (resp.status, resp_body_str))
 end

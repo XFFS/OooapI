@@ -50,8 +50,8 @@ let type_of_string_specs
   fun specs ->
   match specs.str_format with
   | None          -> [%type: string]
-  | Some "binary" -> [%type: [`File of string ]]
-  | Some "uri"    -> [%type: [`String of string]]
+  | Some "binary" -> [%type: string]
+  | Some "uri"    -> [%type: string]
   | Some _        -> [%type: string] (*TODO What should we do with other random format vaules? *)
 
 
