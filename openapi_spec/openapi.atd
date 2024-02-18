@@ -1,7 +1,13 @@
+(** JSON typed stuff *)
+type json <ocaml module="Json" t="t"> = abstract
+
+(** Things that aren't implemented yet *)
+type todo = json
+
 (* https://spec.openapis.org/oas/v3.1.0#path-templating *)
 type path = string wrap <ocaml module="Openapi_path">
 
-(* TODO: Should validate so it complies with https://www.rfc-editor.org/rfc/rfc6838 *)
+(* TODO: Add validation so it complies with https://www.rfc-editor.org/rfc/rfc6838 *)
 type media = string
 
 (* https://spec.openapis.org/oas/v3.1.0#data-types *)
@@ -44,12 +50,6 @@ type schema = json wrap <ocaml module="Json_schema_converter">
 
 (* https://spec.openapis.org/oas/v3.1.0#versions *)
 type version = string
-
-(** JSON typed stuff *)
-type json <ocaml module="Json" t="t"> = abstract
-
-(** Things that aren't implemented yet *)
-type todo = json
 
 (* https://spec.openapis.org/oas/v3.1.0#infoObject *)
 type info =
