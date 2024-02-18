@@ -82,26 +82,26 @@ This then also takes care of all needed dependencies!
 - If in a POST then this goes in the body. We can use =Cohttp.Body.of_form=
 - If in a GET then this goes in the query param. We can use =Uri.with_query=
 ** DONE Add support for application/pdf content
-** TODO Fix all TODOs (esp. around exception raising)
 ** DONE Test on multipart forms
 Will do in Ooapi project
-** TODO Content conversion
-https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
-** TODO Generate Data in recrusive modules to support cycles in schemes
-This is required by https://github.com/XFFS/OooapI/issues/6
-** TODO Report SO on compilation
+** KILL Generate Data in recrusive modules to support cycles in schemes
+Tracked in https://github.com/XFFS/OooapI/issues/6
+
+
+** DONE Report long compilation times of large files?
 Related to
 
 - https://github.com/ocaml/ocaml/issues/11803
 - https://github.com/janestreet/parsexp/issues/10
-** TODO Automate conversion of yaml to json for specs, via yq
-** TODO Put ATD generated sources into the source tree to reduce the dependency cone?
+** DONE Automate conversion of yaml to json for specs, via yq
+** DONE Put ATD generated sources into the source tree to reduce the dependency cone?
+** KILL Add generation of a dune stanza
+Not needed know that we supply a library.
+** TODO Fix all TODOs (esp. around exception raising)
+** TODO Content conversion
+https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
 ** TODO Factor out OCaml of JSONSchema
 This should be useful on its own I guess?
 ** TODO Add mock client for testing
 
 Should just allow inspecting data without making any calls over the network
-** KILL Add generation of a dune stanza
-Not needed know that we supply a library.
-** TODO Support operation-level server override
-See the server field in https://spec.openapis.org/oas/latest.html#fixed-fields-7

@@ -1,21 +1,3 @@
 (library
  (public_name openapi_spec)
  (libraries atdgen json_data_encoding yojson))
-
-(rule
- (targets openapi_j.ml
-          openapi_j.mli)
- (deps    openapi.atd)
- (action  (run atdgen -j -j-std %{deps})))
-
-(rule
- (targets openapi_t.ml
-          openapi_t.mli)
- (deps    openapi.atd)
- (action  (run atdgen -t %{deps})))
-
-(rule
- (targets openapi_v.ml
-          openapi_v.mli)
- (deps    openapi.atd)
- (action  (run atdgen -v %{deps})))

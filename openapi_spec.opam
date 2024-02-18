@@ -10,8 +10,8 @@ homepage: "https://github.com/shonfeder/ooopai"
 bug-reports: "https://github.com/shonfeder/ooopai/issues"
 depends: [
   "dune" {>= "3.7" & > "2.9"}
-  "atdgen" {>= "2.11.0"}
   "uri" {>= "4.2.0"}
+  "atdgen" {with-test & >= "2.11.0"}
   "ppx_expect" {with-test & >= "v0.15.1"}
   "tezt" {with-test}
   "odoc" {with-doc}

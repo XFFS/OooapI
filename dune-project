@@ -55,8 +55,8 @@
  (depends
   (dune (> 2.9))
 
-  (atdgen (>= 2.11.0))
   (uri (>= 4.2.0))
 
+  (atdgen (and :with-test (>= 2.11.0))) ; Only needed for generation of ATD sources
   (ppx_expect (and :with-test (>= v0.15.1)))
   (tezt :with-test)))
