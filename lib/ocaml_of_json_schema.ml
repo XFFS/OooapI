@@ -1,6 +1,9 @@
 open Ppxlib
 open AstUtil
 
+exception Invalid_schema of string
+exception Unsupported_feature of string
+
 let is_nullable
   : Json_schema.element -> bool
   =
@@ -30,7 +33,7 @@ let doc_attrs
 let rec module_name_of_def_ref
   : Json_query.path -> string
   = function
-  | []           -> failwith "invalid component query path"
+  | []           -> raise (Invalid_schema "invalid component query path")
   | [ `Field n ] -> AstExt.to_module_name n
   | _ :: rest    -> module_name_of_def_ref rest
 
@@ -66,9 +69,9 @@ let rec type_of_element
   in
   match (element.kind : Json_schema.element_kind) with
   (* Unsupported schemas *)
-  | Id_ref _ -> failwith "unsupported: id_ref schema"
-  | Ext_ref _ -> failwith "unsupported: ext_ref schema"
-  | Dummy -> failwith "unsupported: dummy schema"
+  | Id_ref _ -> raise (Unsupported_feature "id_ref")
+  | Ext_ref _ -> raise (Unsupported_feature "ext_ref")
+  | Dummy -> raise (Unsupported_feature "dummy")
   (* Supported schemas *)
   | Array (_, _) -> [%type: Yojson.Safe.t list], []
   | Any -> [%type: Yojson.Safe.t], []

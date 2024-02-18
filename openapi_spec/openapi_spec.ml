@@ -24,6 +24,7 @@ let from_file file =
 
 exception Unsupported_reference of string * string
 exception Invalid_reference of string
+exception Invalid_spec of string
 
 let bad_ref r = Invalid_reference r
 
@@ -85,7 +86,6 @@ let dereference_schema : components -> schema -> schema =
           let name = get_name_of_ref ref' in
           { s with
             (* The name is the schema key *)
-            (* TODO Should we be adding these names during deserialization? *)
             name = Some name
           })
   | _ -> schema
@@ -116,9 +116,9 @@ let dereferenced_parameters =
               match p.content with
               | None
               | Some [] ->
-                  failwith "TODO Invalid spec: param without schema or content"
+                raise (Invalid_spec "Invalid spec: parameter without schema or content")
               | Some (_ :: _ :: _) ->
-                  failwith "TODO Invalid spec: only one entry allowed"
+                raise (Invalid_spec "TODO Invalid spec: only one entry allowed")
               | Some [ (media_type, media) ] ->
                   { p with
                     content =

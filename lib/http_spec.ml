@@ -186,7 +186,7 @@ module Message = struct
   let deref : 'a O.or_ref -> 'a = function
     | `Obj a -> a
     | `Ref ref' ->
-        (* All refs should be resolved via `O.resolve_refs` in `of_openapi_spec` *)
+        (* All refs should have already been resolved via `O.resolve_refs` in `of_openapi_spec` *)
         raise (failwith ("unresolved reference " ^ ref'.ref_))
 
   module Request = struct
@@ -405,9 +405,7 @@ let of_openapi_spec : Openapi_spec.t -> t =
   fun spec ->
   let ({ version; title; _ } : O.info) = spec.info in
   if not (open_api_major_version spec.openapi >= 3) then
-    failwith
-      ("Required OpenAPI version 3 or later, spec is for version "
-       ^ spec.openapi);
+    raise (Invalid_spec ("Required OpenAPI version 3 or later, spec is for version " ^ spec.openapi));
   let s = O.resolve_refs spec in
   let base_url =
     match s.servers with
