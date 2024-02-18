@@ -54,7 +54,6 @@
    "ATD-based specification and deserializers of the OpenAPI scheme.")
  (depends
   (dune (> 2.9))
-
   (uri (>= 4.2.0))
 
   (atdgen (and :with-test (>= 2.11.0))) ; Only needed for generation of ATD sources

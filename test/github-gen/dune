@@ -15,13 +15,7 @@
    ; Move the code into the source tree
    (diff? github_api.ml github_api.gen.ml))))
 
-(library
- (name github_api)
- (modules github_api)
- (libraries oooapi_lib)
- (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
-
 (tests
  (names github_api_test)
- (modules github_api_test)
- (libraries github_api oooapi_lib))
+ (libraries oooapi_lib)
+ (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
