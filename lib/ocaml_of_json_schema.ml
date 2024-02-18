@@ -1,10 +1,6 @@
 open Ppxlib
 open AstUtil
 
-(* TODO Factor into separate library as part of the Json_schema package? *)
-(* TODO Account for constraints, like pattern, min/max format etc.?
-   This could be thru abstract types or thru validators in constructors *)
-
 let is_nullable
   : Json_schema.element -> bool
   =
@@ -98,10 +94,6 @@ let rec type_of_element
     let dependency_ordered_declarations = decls @ [decl] in
     (typ, dependency_ordered_declarations)
 
-(* TODO: Add full support by implementing custom JSON Ser/de
-
-   This would be required because Yojson cannot help us with a JSON value that is "untagged"
-   but could be one of many different types. *)
 and type_of_combine
   : qualifier:string
     -> Json_schema.combinator * Json_schema.element list
@@ -201,7 +193,6 @@ and record_label
   let label_type = {pld_type; pld_attributes; pld_name; pld_mutable = Immutable; pld_loc = loc;} in
   label_type, declarations
 
-(* TODO Support for ignored aspects of spec? *)
 and type_decl_of_object
   : name:string
     -> attrs:attribute list

@@ -247,7 +247,6 @@ module ApiMakeFunctor = struct
     let empty = { query = []; path = []; header = []; cookie = [] }
     let to_list { query; path; header; cookie } = query @ path @ header @ cookie
 
-    (* TODO: We need to gather objects, records decls, from parameters *)
     let of_http_spec_param
       : string * H.Message.Params.param -> param
       = fun (name, p) ->
@@ -268,7 +267,7 @@ module ApiMakeFunctor = struct
             | [%type: bool]          -> ([%expr string_of_bool], t)
             | [%type: int]           -> ([%expr string_of_int], t)
             | [%type: float]         -> ([%expr string_of_float], t)
-            (* TODO: Add support for complex types *)
+            (* TODO: Add support for complex types: https://github.com/XFFS/OooapI/issues/10 *)
             | unsupported_typ      ->
               (Printf.eprintf
                  "WARNING: Parameters of type %s not supported for parameter %s, using JSON as fallback. This may be invalid\n"
