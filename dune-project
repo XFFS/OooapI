@@ -24,15 +24,13 @@
  (name oooapi_lib)
  (synopsis "A library abstracting calls to HTTP clients for OooapI")
  (description
-   "A library abstracting calls to HTTP clients and all \
-providing all dependencies needed by OooapI generated clients")
+   "A library abstracting calls to HTTP clients and providing all \
+ dependencies needed by OooapI generated clients")
  (depends
   (dune (> 2.9))
-  (ocaml (>= 5.0))
 
   openapi_spec
 
-  ;  TODO Remove uneeded deps
   (multipart_form (>= 0.5.0))
   (multipart_form-lwt (>= 0.5.0))
   (multipart_form-cohttp-lwt (>= 0.5.0))
@@ -41,8 +39,8 @@ providing all dependencies needed by OooapI generated clients")
   (http (>= 6.0.0~alpha1))
   (tls (>= 0.17.0))
   (tls-lwt (>= 0.17.0))
+  (camelsnakekebab (>= 0.4))
 
-  ; Required bi
   (ppx_deriving_yojson (>= 3.7.0))
   (ppx_deriving (>= 5.2.1))
 
@@ -51,8 +49,9 @@ providing all dependencies needed by OooapI generated clients")
 
 (package
  (name openapi_spec)
- (synopsis "Short description")
- (description "Longer description")
+ (synopsis "A representation of OpenAPI in OCaml data types")
+ (description
+   "ATD-based specification and deserializers of the OpenAPI scheme.")
  (depends
   (dune (> 2.9))
 
