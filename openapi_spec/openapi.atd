@@ -1,7 +1,7 @@
 (** JSON typed stuff *)
 type json <ocaml module="Json" t="t"> = abstract
 
-(** Things that aren't implemented yet *)
+(** TODO Things that aren't implemented yet *)
 type todo = json
 
 (* https://spec.openapis.org/oas/v3.1.0#path-templating *)
