@@ -6,6 +6,7 @@ OCaml clients from OpenAPI specs.
 * Table of Contents :TOC:
 - [[#overview][Overview]]
   - [[#aims][Aims]]
+  - [[#generated-client-library-principles][Generated Client Library Principles]]
   - [[#caveat][Caveat]]
   - [[#known-limitations][Known Limitations]]
   - [[#alternatives][Alternatives]]
@@ -23,7 +24,7 @@ OooapI[fn:1] is OCaml of (and for) OpenAPI 3.0 specs.
 
 OooapI currently supports:
 
-- Generating OCaml clients for a (a substantial) fragment of the OpenAPI
+- Generating OCaml clients for a (substantial) fragment of the OpenAPI
   specification schema.
 - Generating a family of OCaml types encoding the supported OpenAPI fragment's
   request and response data.
@@ -34,16 +35,16 @@ OooapI currently supports:
   OCaml client library. It should *not* generate boilerplate for an OCaml client
   that requires manual revision.
 - If any extension, revision, or alteration of the generated client library is
-  necessary, it should be achievable by shadowing OCaml values, types or modules, rather
-  than requiring editing the generated library.
-  generated source.
+  necessary, it should be achievable by shadowing OCaml values, types, or
+  modules, rather than requiring editing the generated source code.
 - As little code should be dynamically generated as possible. Instead, put all
-  reusable logic into the [[file:oooapi_lib/oooapi_lib.ml][=Oooapi_lib= library]].
+  reusable logic into the [[file:oooapi_lib/oooapi_lib.ml][=Oooapi_lib= library]]. *Abstraction is a better form of
+  automation than boilerplate generation.*
 
-*** Client Library Principles
+** Generated Client Library Principles
 
-- Each operation is defined as a function.
-- Everything that ends up the body of request is passed together as a
+- Each specified operation is taken to define a function.
+- Everything that ends up the body of a request is passed together as a
   single =~data= argument to an operation function, whether multipart form, JSON,
   or binary data.
 - Anything that goes in the path, query parameters, or headers, is passed via
@@ -54,11 +55,11 @@ OooapI currently supports:
 
 ** Caveat
 
-This tool, and the associated library, is meant to assist OCaml programmers who
-need to interface with servers that (correctly) specify their API via OpenAPI.
-However, if an alternative machine-readable specification is available, we would
-recommend considering using it instead. Moreover, we would discourage server
-authors from using OpenAPI to specify their systems.
+The =oooapi= tool, and its associated library, is meant to assist OCaml
+programmers who need to interface with servers that (correctly) specify their
+API via OpenAPI v3. However, if an alternative machine-readable specification is
+available, we would recommend considering using it. We would also discourage
+server authors from using OpenAPI to specify their systems.
 
 Our work on this project has led us to conclude that OpenAPI and JSON Schema
 (upon which the former depends) are bad specification formats. Both formats
@@ -75,31 +76,37 @@ intentions or abilities of those who have worked so hard on these efforts.
 *** YAML is not supported
 YAML may include references and all kinds of other junk. It is an overly
 complicated format, and the available OCaml libraries for parsing it don't cover
-all of its baroque girth. We bypass this problem by expecting the spec to be
-given in JSON. Many tools are available to normalize YAML into JSON.
-*** JSON Schema ([[https://github.com/XFFS/OooapI/issues/9][#9]]):
-- Limited support for JSON Schema's =oneOf=, =anyOf=, =allOf=, and
-  =not=. Only uniform simple types (string, numerics, monomorphic) arrays are
-  supported. Anything else is treated as untyped JSON.
+all of its baroque girth. We bypass this problem by expecting the OpenAPI spec
+to be in JSON. Many tools are available to normalize YAML into JSON.
+*** JSON Schema ([[https://github.com/XFFS/OooapI/issues/9][#9]])
+Limited support for JSON Schema's =oneOf=, =anyOf=, =allOf=, and
+=not=. Only uniform simple types (string, numerics, monomorphic) arrays are
+supported. Anything else is treated as untyped JSON.
 *** Media types ([[https://github.com/XFFS/OooapI/issues/11][#11]])
-- Proper serialization support is only provided for JSON and multi-part forms,
-  all other media types are passed along as unserialized binary strings.
-- Proper serialization support is only provided for JSON, all other media types
-  are passed along as unserialized binary strings.
+- Proper *serialization* support is only provided for *JSON* and *multi-part
+  forms*, all other media types are passed along as unserialized binary strings.
+Proper *deserialization* support is only provided for JSON, all other media
+types are passed along as unserialized binary strings.
 *** Recursive scheme definitions are not supported ([[https://github.com/XFFS/OooapI/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22][#6]])
-- This is used, for instance, in Stripe's API
+This is used, for instance, in Stripe's API (this is currently the only known
+hard blocker for generating code for Stripe's API).
 *** Responses ([[https://github.com/XFFS/OooapI/issues/12][#12]])
-- Deserialization is only automated for the first [[https://spec.openapis.org/oas/latest.html#responsesObject][ResponseObject]] handling a
-  success code, any other responses are returned by an operation function as raw
-  data in an error result.
+Deserialization is only automated for the first [[https://spec.openapis.org/oas/latest.html#responsesObject][ResponseObject]] handling a
+success code, any other responses are returned by an operation function as raw
+data in an error result.
 *** Parameters ([[https://github.com/XFFS/OooapI/issues/10][#10]])
-- OpenAPI "parameters" are unruly and the spec makes it hard to work with them
-  correctly, as a result we only have basic support for most "parameters". In
-  particular, we do not have full support for complex, custom data-structures in
-  parameters. Instead, these are just treated as untyped json. Custom defined
-  shadowing functions may be needed to serialize them correctly.
+OpenAPI "parameters" are unruly and the spec makes it hard to work with them
+correctly, as a result we only have basic support for most "parameters". In
+particular, we do not have full support for complex, custom data-structures in
+parameters. Instead, these are just treated as untyped json. Custom defined
+shadowing functions may be needed to serialize them correctly.
 *** File structure ([[https://github.com/XFFS/OooapI/issues/14][#14]])
-- All client code currently goes into one file. This can drag down build times.
+All client code currently goes into one file. This can drag down build times.
+*** Depends on Cohttp and Lwt ([[https://github.com/XFFS/OooapI/issues/15][#15]])
+The current implementation is hard coded to depend on =Cohttp= and =Lwt=.
+These libraries are great, but it should be easy to remove this requirement,
+as the generateed API client code is functorized on the HTTP client library.
+
 
 ** Alternatives
 
@@ -142,19 +149,18 @@ We explored contributing fixes to the generator, but after investigating the
 implementation, we came to the conclusion that the approach to generation via
 [[https://github.com/OpenAPITools/openapi-generator/tree/c6a4947523dd079492d3604d45e451a31f5e94a7/modules/openapi-generator/src/main/resources/ocaml][mustache templates]] was too fragile and ad hoc to be worth the invested time.
 
-We hope that approaching this problem through a principled metaprogramming
-approach, leveraging OCaml's ppx system and supporting libraries, will enable a
-more modular and a more correct implementation.
+We hope that facing this problem through a principled metaprogramming approach,
+leveraging OCaml's ppx system and AST libraries, will enable pursing a more
+modular, maintainable, and correct implementation.
 
 *** Why OpenAPI?
-
 All that said, we have come to the conclusion that the main problems troubling
-OpenAPI-Generator are probably just inheritence from the copious accidental
-complexity permeating JSON Schema and OpenaAPI.
+OpenAPI-Generator are probably inheritence from the copious accidental
+complexity permeating JSON Schema and OpenaAPI. But since there are a lot of
+APIs that use OpenAPI, we hope that this project may be of some value to the
+OCaml ecosystem, even if only as a cautionary tale or as a place to start when
+building something better.
 
-That said, there are a lot of APIs that use OpenAPI, so we hope that this
-project may be of some value to the OCaml ecosystem, even if only as a
-cautionary tale or as a place to start when building something better.
 * Usage
 
 ** Install
@@ -212,17 +218,30 @@ Set up some dune rules to build the client and put it in your source tree
                   ppx_deriving.make))) ; These derivers are also required
 #+end_src
 
-Then use it in your code
+Then use it in your code (here's an example adapted from our [[file:test/github-gen/github_api_test.ml][GitHub API Test]]):
 
 #+begin_src ocaml
 module Ooo = Oooapi_lib
 module Config : Ooo.Config = struct
-  let bearer_token = Sys.getenv_opt "SOME_API_TOKEN" (* Assuming this is required for the API *)
+  let bearer_token = None (* Supply this if needed, reading from the env and NOT IN YOUR SOURCE CODE :) *)
   let default_headers = None
 end
 
-module Data = Oopenai.Data (* The generated data types *)
-module API = Oopenai.Make (Ooo.Cohttp_client) (Config) (* The API library *)
+module Api = Github_api.Make (Ooo.Cohttp_client) (Config)
+
+let main =
+  let open Lwt_result.Syntax in
+  let+ readme_file = Api.repos_get_readme ~owner:"shonfeder" ~repo:"nomad" () in
+  readme_file.name
+
+let () =
+  match Lwt_main.run main with
+  | Ok file_name ->
+    print_endline file_name
+  | Error (`Deserialization (_data, err))
+  | Error (`Request (_code, err)) ->
+    Printf.eprintf "Error %s\n%!" err;
+    exit 1
 #+end_src
 
 ** Examples
