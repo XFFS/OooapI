@@ -1,6 +1,6 @@
 open Tezt
 open Tezt.Base
-open Lib.Http_spec
+(* open Lib.Http_spec *)
 
 (* TODO Write tests for the http_spec conversion *)
 let test ?(tags = [ "http_spec" ]) title f =
