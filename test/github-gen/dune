@@ -15,7 +15,11 @@
    ; Move the code into the source tree
    (diff? github_api.ml github_api.gen.ml))))
 
-(tests
- (names github_api_test)
+(executable
+ (name github_api_test)
  (libraries oooapi_lib)
  (preprocess (pps ppx_deriving_yojson ppx_deriving.make)))
+
+(rule
+ (alias longtest)
+ (action (run ./github_api_test.exe)))
