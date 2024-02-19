@@ -1,6 +1,8 @@
 open Ppxlib
 open AstUtil
 
+module H = Http_spec
+
 exception Invalid_schema of string
 exception Unsupported_feature of string
 
@@ -43,21 +45,31 @@ let type_name_of_def_ref
   fun p ->
   module_name_of_def_ref p ^ ".t"
 
+(* TODO: When `binary` is given for a JSON, we need to ser/de a string, but when given for mulitpart form data,
+   we want to receive a file name unless we want to redesign the multipart form library somehow...,
+   but I think that will be a worse UI.
+
+   What this entails is that we cannot simple derive a type from the json schema, but also need to be considering
+   the media type which the schema is meant to represent. *)
+
 let type_of_string_specs
-  : Json_schema.string_specs -> core_type
+  : media:H.Media_kind.t -> Json_schema.string_specs -> core_type
   =
-  fun specs ->
-  match specs.str_format with
-  | None          -> [%type: string]
-  | Some "binary" -> [%type: string]
-  | Some "uri"    -> [%type: string]
-  | Some _        -> [%type: string] (*TODO What should we do with other random format vaules? *)
+  fun ~media specs ->
+  match specs.str_format, media with
+  | None, _          -> [%type: string]
+  | Some "uri", _    -> [%type: string]
+  | Some "binary", `Multipart_form ->
+    [%type: [`File of string]]
+  | Some "binary", _ ->
+    [%type: string]
+  | Some _, _        -> [%type: string] (*TODO What should we do with other random format vaules? *)
 
 
 let rec type_of_element
-  : qualifier:string -> Json_schema.element -> (core_type * type_declaration list)
+  : qualifier:string -> media:H.Media_kind.t -> Json_schema.element -> (core_type * type_declaration list)
   =
-  fun ~qualifier element ->
+  fun ~qualifier ~media element ->
   let maybe_nullable
     : core_type -> core_type
     = fun typ ->
@@ -79,26 +91,27 @@ let rec type_of_element
   | Boolean ->  maybe_nullable [%type: bool], []
   | Integer _ -> maybe_nullable [%type: int], []
   | Number _ -> maybe_nullable [%type: float], []
-  | String s -> maybe_nullable (type_of_string_specs s) , []
+  | String s -> maybe_nullable (type_of_string_specs ~media s) , []
   | Combine (comb, elems) ->
-    let typ, decls = type_of_combine ~qualifier (comb, elems) in
+    let typ, decls = type_of_combine ~qualifier ~media (comb, elems) in
     maybe_nullable typ, decls
   | Def_ref path ->
     let typ = AstExt.Type.v (AstExt.Type.constr (type_name_of_def_ref path)) |> maybe_nullable in
     (typ, [])
   | Monomorphic_array (e, _) ->
     let item_type_name = qualifier ^ "_item" in
-    let item_type, decls = type_of_element ~qualifier:item_type_name e in
+    let item_type, decls = type_of_element ~qualifier:item_type_name ~media e in
     let typ = maybe_nullable [%type: [%t item_type] list] in
     (typ, decls)
   | Object o ->
-    let decl, decls = type_decl_of_object ~name:qualifier ~attrs:(doc_attrs element) o in
+    let decl, decls = type_decl_of_object ~name:qualifier ~media ~attrs:(doc_attrs element) o in
     let typ = AstExt.Type.v (AstExt.Type.constr qualifier) |> maybe_nullable in
     let dependency_ordered_declarations = decls @ [decl] in
     (typ, dependency_ordered_declarations)
 
 and type_of_combine
   : qualifier:string
+    -> media:H.Media_kind.t
     -> Json_schema.combinator * Json_schema.element list
     -> (core_type * type_declaration list)
   =
@@ -127,7 +140,7 @@ and type_of_combine
             )
         |> Option.is_some
   in
-  fun ~qualifier (comb, elems) ->
+  fun ~qualifier ~media (comb, elems) ->
     match comb with
     | Json_schema.Not -> [%type: Yojson.Safe.t], []
     | Json_schema.All_of
@@ -139,17 +152,18 @@ and type_of_combine
         if are_unform_simple_type elems then
           (* If all alternatives are representable vial the same simple type,
               just give it the type of the first in the list. *)
-          type_of_element ~qualifier e
+          type_of_element ~qualifier ~media e
         else
           (* Otherwise, it is left untyped *)
           [%type: Yojson.Safe.t], []
 
 and record_label
   : type_name:string
+    -> media:H.Media_kind.t
     -> string * Json_schema.element * bool * _
     -> label_declaration * type_declaration list
   =
-  fun ~type_name (field_name, element, required, _) ->
+  fun ~type_name ~media (field_name, element, required, _) ->
   let fname =
     AstExt.to_identifier @@
     if String.equal type_name "t" then
@@ -161,7 +175,7 @@ and record_label
       (type_name ^ "_" ^ field_name)
   in
   let pld_type, declarations =
-    let field_type, decls = type_of_element ~qualifier:fname element in
+    let field_type, decls = type_of_element ~qualifier:fname ~media element in
     let field_type = if required then field_type else [%type: [%t field_type] option] in
     field_type, decls
   in
@@ -198,11 +212,12 @@ and record_label
 
 and type_decl_of_object
   : name:string
+    -> media:H.Media_kind.t
     -> attrs:attribute list
     -> Json_schema.object_specs
     -> (type_declaration * type_declaration list)
   =
-  fun ~name ~attrs { properties; _ } ->
+  fun ~name ~media ~attrs { properties; _ } ->
   match properties with
   | [] ->
     let manifest = [%type: Yojson.Safe.t] in
@@ -214,7 +229,7 @@ and type_decl_of_object
       properties |> ListLabels.fold_right
         ~init:([], [])
         ~f:(fun property (labels, decls) ->
-            let (label, decls') = record_label ~type_name:name property in
+            let (label, decls') = record_label ~type_name:name ~media property in
             label :: labels, decls' @ decls)
     in
     let kind = Ptype_record labels in
@@ -222,16 +237,19 @@ and type_decl_of_object
     let main_decl = AstExt.Type.decl name ~kind ~attributes in
     (main_decl, decls)
 
+(* NOTE: For use in OpenAPI, we must also take account of the media type. This is
+   Because the same JSON Schema has different meanings depending on whether it is meant
+   to represent data for, e.g., a JSON blob or a multipart form. *)
 let type_declarations
-  : Json_schema.schema -> (type_declaration * type_declaration list)
+  : media:H.Media_kind.t -> Json_schema.schema -> (type_declaration * type_declaration list)
   =
-  fun schema ->
+  fun ~media schema ->
   let name = "t" in
   let root =  Json_schema.root schema  in
   let attrs = doc_attrs root in
   match root.kind with
-  | Object specs -> type_decl_of_object ~name ~attrs specs
+  | Object specs -> type_decl_of_object ~name ~media ~attrs specs
   | _ ->
     let attributes = deriving_attrs ~is_record:false @ attrs in
-    let typ, decls = type_of_element ~qualifier:name root in
+    let typ, decls = type_of_element ~qualifier:name ~media root in
     AstExt.Type.decl name ~attributes ~manifest:typ, decls
