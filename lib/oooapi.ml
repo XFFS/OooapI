@@ -117,7 +117,8 @@ module DataModule = struct
     = fun name schema ->
       let name_str = AstExt.to_module_name name in
       let name = n (Some name_str) in
-      let main_decl, declarations = Ocaml_of_json_schema.type_declarations schema.schema.schema in
+      let media = schema.kind in
+      let main_decl, declarations = Ocaml_of_json_schema.type_declarations ~media schema.schema.schema in
       let type_declarations =
         let dependency_ordered_declarations = declarations @ [main_decl] in
         List.map (fun decl -> Ast.pstr_type Recursive [decl]) dependency_ordered_declarations
@@ -174,7 +175,7 @@ module DataModule = struct
     let module Graph = DAG.Make (String) in
     let add_dependency graph (src, (s : Http_spec.schema)) =
       (* Add each schema and its deps to the graph *)
-      let deps = s.schema.schema |> Json_schema.root |> element_deps  in
+      let deps = s.schema.schema |> Json_schema.root |> element_deps in
       Graph.add_arcs ~src deps graph
     in
     let generate_data_module schema_label =
@@ -258,8 +259,9 @@ module ApiMakeFunctor = struct
         let default, to_string =
           let schema = p.schema.schema.schema in
           let elem = Json_schema.root schema in
+          let media = p.schema.kind in
           let to_string, typ =
-            let t = Ocaml_of_json_schema.type_of_element ~qualifier:"not_applicable____" elem |> fst in
+            let t = Ocaml_of_json_schema.type_of_element ~media ~qualifier:"not_applicable____" elem |> fst in
             match t with
             | [%type: string]        -> ([%expr fun x -> x], t)
             | [%type: string option] -> ([%expr Option.get], t)

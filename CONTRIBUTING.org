@@ -38,12 +38,17 @@ To test spec parsing and client generation
 dune test
 #+end_src
 
-On a fresh build, the latter can take a long time (~10 mins) dune to the size of
-the generated github API.
-
 To run the end to end tests against the OpenAI API
 
 #+begin_src sh
 export OPENAI_API_KEY=<your-api-key>
 export LOCAL_TESTS=true
 #+end_src
+
+To build and run the tests on the GitHub api, run
+
+#+begin_src sh
+dune build @longtest
+#+end_src
+
+This takes 10mins or more (to build) due to the size of the generated code.
