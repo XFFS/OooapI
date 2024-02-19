@@ -1,10 +1,21 @@
 #+title: OooapI: OCaml of OpenAPI
 
-*tl;dr*: OooapI aims to implement a solution to this problem:
+OooapI is OCaml of OpenAPI (v3): it is an executable that tries to generate
+OCaml clients from OpenAPI specs.
 
-#+begin_src prolog
-spec:'OpenAPI spec' -> 'client library for'(spec):OCaml
-#+end_src
+* Table of Contents :TOC:
+- [[#overview][Overview]]
+  - [[#aims][Aims]]
+  - [[#caveat][Caveat]]
+  - [[#known-limitations][Known Limitations]]
+  - [[#alternatives][Alternatives]]
+  - [[#motivation][Motivation]]
+- [[#usage][Usage]]
+  - [[#install][Install]]
+  - [[#generate-ocaml-code-from-an-openapi-spec][Generate OCaml code from an OpenAPI spec]]
+  - [[#use-oooapi-in-a-dune-project][Use oooapi in a dune project]]
+  - [[#examples][Examples]]
+- [[#footnotes][Footnotes]]
 
 * Overview
 
@@ -17,83 +28,94 @@ OooapI currently supports:
 - Generating a family of OCaml types encoding the supported OpenAPI fragment's
   request and response data.
 
-* Aims
+** Aims
 
 - Given an OpenAPI server spec, OooapI should produce a completes and correct
   OCaml client library. It should *not* generate boilerplate for an OCaml client
   that requires manual revision.
 - If any extension, revision, or alteration of the generated client library is
-  necessary, it should be done via the OCaml module system, not by editing the
+  necessary, it should be achievable by shadowing OCaml values, types or modules, rather
+  than requiring editing the generated library.
   generated source.
 - As little code should be dynamically generated as possible. Instead, put all
-  reusable logic into the =Oooapi_lib= library.
+  reusable logic into the [[file:oooapi_lib/oooapi_lib.ml][=Oooapi_lib= library]].
 
-** Client Library Principles
+*** Client Library Principles
 
 - Each operation is defined as a function.
-- Everything that ends up the body of POST request is passed together as a
-  single ~data argument to an operation function, whether multipart form, JSON,
+- Everything that ends up the body of request is passed together as a
+  single =~data= argument to an operation function, whether multipart form, JSON,
   or binary data.
 - Anything that goes in the path, query parameters, or headers, is passed via
   arguments to an operation function.
 - Try to fail gracefully: JSON Schemas that are too complicated for us to
-  support currently should degrade to untyped json.
+  support currently should degrade into untyped json that can be decoded
+  manually.
 
-* Caveat
+** Caveat
 
 This tool, and the associated library, is meant to assist OCaml programmers who
-need to interface with servers that specify their API via OpenAPI. However, if
-an alternative machine-readable specification is available, we would recommend
-considering using it. Moreover, we would discourage server authors from using
-OpenAPI to specify their systems.
+need to interface with servers that (correctly) specify their API via OpenAPI.
+However, if an alternative machine-readable specification is available, we would
+recommend considering using it instead. Moreover, we would discourage server
+authors from using OpenAPI to specify their systems.
 
-We have come to the conclusion that OpenAPI and JSON Schema (upon which the
-former depends) are bad specification languages. Both languages adopt and
-propagate accidental complexity and inconsistent structure, and we believe that
-their widespread adoption in web development is a dangerous and costly
-proliferation of systemic technical debt.
+Our work on this project has led us to conclude that OpenAPI and JSON Schema
+(upon which the former depends) are bad specification formats. Both formats
+adopt and propagate accidental complexity and inconsistent structures, and we
+believe that their widespread adoption in web development is a dangerous and
+costly proliferation of systemic technical debt.
 
 We have compiled [[./notes.org][some notes explaining the rationale for this assessment]].
 
 Please not this assessment is purely technical, and not a judgment about the
 intentions or abilities of those who have worked so hard on these efforts.
 
-* Alternatives
-
-- [[https://github.com/OpenAPITools/openapi-generator/][OpenAPI Generator]] includes a generator that is meant to produce OCaml client boilerplate.
-- [[https://github.com/andrenth/ocaml-swagger][OCaml-Swagger]] is a code generator that implements Swagger 2.0 API clients in OCaml.
-
-* Known Limitations
-# TODO Correlate with issues
-** JSON Schema:
+** Known Limitations
+*** YAML is not supported
+YAML may include references and all kinds of other junk. It is an overly
+complicated format, and the available OCaml libraries for parsing it don't cover
+all of its baroque girth. We bypass this problem by expecting the spec to be
+given in JSON. Many tools are available to normalize YAML into JSON.
+*** JSON Schema ([[https://github.com/XFFS/OooapI/issues/9][#9]]):
 - Limited support for JSON Schema's =oneOf=, =anyOf=, =allOf=, and
   =not=. Only uniform simple types (string, numerics, monomorphic) arrays are
   supported. Anything else is treated as untyped JSON.
-** Media types
+*** Media types ([[https://github.com/XFFS/OooapI/issues/11][#11]])
 - Proper serialization support is only provided for JSON and multi-part forms,
   all other media types are passed along as unserialized binary strings.
 - Proper serialization support is only provided for JSON, all other media types
   are passed along as unserialized binary strings.
-** Recursive scheme definitions are not supported
+*** Recursive scheme definitions are not supported ([[https://github.com/XFFS/OooapI/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22][#6]])
 - This is used, for instance, in Stripe's API
-** Responses
+*** Responses ([[https://github.com/XFFS/OooapI/issues/12][#12]])
 - Deserialization is only automated for the first [[https://spec.openapis.org/oas/latest.html#responsesObject][ResponseObject]] handling a
   success code, any other responses are returned by an operation function as raw
   data in an error result.
-** Parameters
+*** Parameters ([[https://github.com/XFFS/OooapI/issues/10][#10]])
 - OpenAPI "parameters" are unruly and the spec makes it hard to work with them
   correctly, as a result we only have basic support for most "parameters". In
   particular, we do not have full support for complex, custom data-structures in
   parameters. Instead, these are just treated as untyped json. Custom defined
   shadowing functions may be needed to serialize them correctly.
+*** File structure ([[https://github.com/XFFS/OooapI/issues/14][#14]])
+- All client code currently goes into one file. This can drag down build times.
 
-* Motivation
+** Alternatives
 
+- [[https://github.com/OpenAPITools/openapi-generator/][OpenAPI Generator]] includes a generator that is meant to produce OCaml client boilerplate.
+- [[https://github.com/andrenth/ocaml-swagger][OCaml-Swagger]] is a code generator that implements Swagger 2.0 API clients in OCaml.
+
+** Motivation
+
+*** Why not OCaml-Swagger
 We did not find OCaml-Swagger until most initial work had been completed on this
-project. We were only looking for OpenAPI generation, and did not think to look
-for "swagger". That said, OCaml-Swagger only supports (part of) Swagger 2.0,
-which was released in 2014. OooapI supports (part of) OpenAPI version 3,
+project, because we were only looking for OpenAPI generation, and did not think
+to look for "swagger". That said, OCaml-Swagger only supports (part of) Swagger
+2.0, which was released in 2014. OooapI supports (part of) OpenAPI version 3,
 released in 2017.
+
+*** Why not OpenAPI Generator
 
 At the time work on this library was initiated, the OCaml client generation
 supplied by OpenAPI Generator had the following documented errors:
@@ -124,9 +146,89 @@ We hope that approaching this problem through a principled metaprogramming
 approach, leveraging OCaml's ppx system and supporting libraries, will enable a
 more modular and a more correct implementation.
 
+*** Why OpenAPI?
+
 All that said, we have come to the conclusion that the main problems troubling
 OpenAPI-Generator are probably just inheritence from the copious accidental
-complexity permeating JSON Schema and OpenaAPI
+complexity permeating JSON Schema and OpenaAPI.
+
+That said, there are a lot of APIs that use OpenAPI, so we hope that this
+project may be of some value to the OCaml ecosystem, even if only as a
+cautionary tale or as a place to start when building something better.
+* Usage
+
+** Install
+
+#+begin_src sh
+opam pin git@github.com:XFFS/OooapI.git
+#+end_src
+
+** Generate OCaml code from an OpenAPI spec
+
+#+begin_src sh
+$ oooapi some-server-api.json > Some_server_api.ml
+#+end_src
+
+** Use oooapi in a dune project
+
+Set up some dune rules to build the client and put it in your source tree
+
+#+begin_src lisp
+; In case only a YAML version of the spec is available,
+; it needs to be converted to JSON.
+; This rule uses https://github.com/mikefarah/yq
+(rule
+ (target spec.json)
+ (deps (:spec spec.yaml))
+ (action
+  (with-stdout-to %{target}
+   (with-stdin-from %{spec}
+    (run yq --output-format json)))))
+
+; Generate the client
+(rule
+ (alias generate)
+ (target api.ml)
+ (deps %{bin:oooapi}
+       (:spec spec.json))
+ (action
+  (progn
+
+   ; Generate the client code
+   (with-stdout-to api.gen.ml
+    (run oooapi %{spec}))
+
+   ; (optional) Format the code
+   (run ocamlformat --inplace api.gen.ml)
+
+   ; Move the code into the source tree
+   (diff? %{target} api.gen.ml))))
+
+; In casi you want the code as its own libary component
+(library
+ (public_name api)
+ (libraries oooapi_lib) ; The oooapi_lib is requires for oooapi generated code to work
+ (preprocess (pps ppx_deriving_yojson
+                  ppx_deriving.make))) ; These derivers are also required
+#+end_src
+
+Then use it in your code
+
+#+begin_src ocaml
+module Ooo = Oooapi_lib
+module Config : Ooo.Config = struct
+  let bearer_token = Sys.getenv_opt "SOME_API_TOKEN" (* Assuming this is required for the API *)
+  let default_headers = None
+end
+
+module Data = Oopenai.Data (* The generated data types *)
+module API = Oopenai.Make (Ooo.Cohttp_client) (Config) (* The API library *)
+#+end_src
+
+** Examples
+
+- [[file:test/github-gen/][Basic usage with the GitHub spec]].
+- [[https://github.com/XFFS/oopenai][More robust usage with the OpenAI]].
 
 * Footnotes
 

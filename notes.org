@@ -97,10 +97,10 @@ Related to
 ** DONE Put ATD generated sources into the source tree to reduce the dependency cone?
 ** KILL Add generation of a dune stanza
 Not needed know that we supply a library.
-** TODO Fix all TODOs (esp. around exception raising)
+** DONE Fix all TODOs (esp. around exception raising)
 ** TODO Content conversion
 https://spec.openapis.org/oas/latest.html#considerations-for-file-uploads
-** TODO Factor out OCaml of JSONSchema
+** DONE Factor out OCaml of JSONSchema
 This should be useful on its own I guess?
 ** TODO Add mock client for testing
 
