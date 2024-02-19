@@ -18,9 +18,20 @@ let ok_or_handle_error result =
       err;
     exit 1
 
+let usage = {|oooapi [spec_file]
+
+Input should be an OpenAPI specification conforming to OpenAPI v3, and formatted in JSON.
+
+Input can be provided in two ways:
+
+- If spec_file is provided, it should be a .json file.
+- If no file is given, oooapi will read from stdin.
+
+The output is an OCaml client library for the API, and is streamed to stdout.
+|}
 let () =
   let spec_file = ref "" in
-  Arg.parse [] (fun f -> spec_file := f) "oooapi [spec_file]";
+  Arg.parse [] (fun f -> spec_file := f) usage;
   !spec_file
   |> (function
       | ""   -> Openapi_spec.from_in_channel In_channel.stdin
