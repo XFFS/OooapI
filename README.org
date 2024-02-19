@@ -85,8 +85,8 @@ supported. Anything else is treated as untyped JSON.
 *** Media types ([[https://github.com/XFFS/OooapI/issues/11][#11]])
 - Proper *serialization* support is only provided for *JSON* and *multi-part
   forms*, all other media types are passed along as unserialized binary strings.
-Proper *deserialization* support is only provided for JSON, all other media
-types are passed along as unserialized binary strings.
+- Proper *deserialization* support is only provided for JSON, all other media
+  types are passed along as unserialized binary strings.
 *** Recursive scheme definitions are not supported ([[https://github.com/XFFS/OooapI/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22][#6]])
 This is used, for instance, in Stripe's API (this is currently the only known
 hard blocker for generating code for Stripe's API).
@@ -150,7 +150,7 @@ implementation, we came to the conclusion that the approach to generation via
 [[https://github.com/OpenAPITools/openapi-generator/tree/c6a4947523dd079492d3604d45e451a31f5e94a7/modules/openapi-generator/src/main/resources/ocaml][mustache templates]] was too fragile and ad hoc to be worth the invested time.
 
 We hope that facing this problem through a principled metaprogramming approach,
-leveraging OCaml's ppx system and AST libraries, will enable pursing a more
+leveraging OCaml's ppx system and AST libraries, will enable pursuing a more
 modular, maintainable, and correct implementation.
 
 *** Why OpenAPI?
@@ -210,7 +210,7 @@ Set up some dune rules to build the client and put it in your source tree
    ; Move the code into the source tree
    (diff? %{target} api.gen.ml))))
 
-; In casi you want the code as its own libary component
+; In case you want the code as its own libary component
 (library
  (public_name api)
  (libraries oooapi_lib) ; The oooapi_lib is requires for oooapi generated code to work
